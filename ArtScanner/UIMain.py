@@ -668,11 +668,61 @@ class Worker(QObject):
         self.material_id = 0
         self.saved_material = 0
         self.failed_material = 0
+        debug_material_crop = os.environ.get("AMENOMA_DEBUG_MATERIAL_CROP") == "1"
+        debug_material_dir = None
+        debug_material_jsonl = None
+        if debug_material_crop:
+            debug_material_dir = os.path.join("materials", "debug_material_scan", time.strftime("%Y%m%d-%H%M%S"))
+            os.makedirs(debug_material_dir, exist_ok=True)
+            debug_material_jsonl = os.path.join(debug_material_dir, "debug_material_scan.jsonl")
+            with open(debug_material_jsonl, "w", encoding="utf-8"):
+                pass
+            self.logger.info(f"[MaterialDebug] Debug crop dump enabled. path={debug_material_dir}")
 
         def autoCorrect(detected_info):
             detected_info['name'] = utils.material_name_auto_correct(detected_info['name'])
 
-        def materialFilter(detected_info, detail_img, item_img):
+        def dumpMaterialDebug(debug_id, raw_detected_info, detected_info, detail_img, item_img, debug_info, status):
+            if not debug_material_crop:
+                return
+            try:
+                prefix = f"{debug_id:06d}"
+                item_path = os.path.join(debug_material_dir, f"{prefix}_item.png")
+                detail_path = os.path.join(debug_material_dir, f"{prefix}_detail.png")
+                amount_path = os.path.join(debug_material_dir, f"{prefix}_amount_crop.png")
+                name_path = os.path.join(debug_material_dir, f"{prefix}_name_crop.png")
+
+                item_img.save(item_path)
+                detail_img.save(detail_path)
+                crops = self.model_m.extract_art_info(detail_img, item_img)
+                crops['amount'].save(amount_path)
+                crops['name'].save(name_path)
+
+                scale_ratio = self.model_m.scale_ratio
+                record = {
+                    "material_id": debug_id,
+                    "status": status,
+                    "scanner": debug_info,
+                    "raw_detected_info": raw_detected_info,
+                    "final_detected_info": dict(detected_info),
+                    "scale_ratio": scale_ratio,
+                    "ocr_crop_coords": {
+                        "amount": [i * scale_ratio for i in ocr_m.Config.amount_coords],
+                        "name": [i * scale_ratio for i in ocr_m.Config.name_coords],
+                    },
+                    "paths": {
+                        "item_img": item_path,
+                        "detail_img": detail_path,
+                        "amount_crop": amount_path,
+                        "name_crop": name_path,
+                    },
+                }
+                with open(debug_material_jsonl, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            except Exception as e:
+                self.logger.exception(e)
+
+        def materialFilter(detected_info, detail_img, item_img, raw_detected_info=None, debug_info=None):
             """
             0 - init value
             1 - skipped
@@ -680,6 +730,7 @@ class Worker(QObject):
             3 - failed
             """
             status = 0
+            debug_id = self.material_id + 1
 
             try:
                 autoCorrect(detected_info)
@@ -707,6 +758,7 @@ class Worker(QObject):
                 status = 3
                 self.failed_material += 1
             self.material_id += 1
+            dumpMaterialDebug(debug_id, raw_detected_info, detected_info, detail_img, item_img, debug_info, status)
             saveImg(detected_info, detail_img, item_img, status)
 
         def saveImg(detected_info, detail_img, item_img, status):
@@ -732,9 +784,10 @@ class Worker(QObject):
                     with open(f"materials/fail_{self.material_id}.json", "wb") as f:
                         f.write(s.encode('utf-8'))
 
-        def material_callback(detail_img, item_img):
+        def material_callback(detail_img, item_img, debug_info=None):
             detectedInfo = self.model_m.detect_info(detail_img, item_img)
-            materialFilter(detectedInfo, detail_img, item_img)
+            rawDetectedInfo = dict(detectedInfo) if debug_material_crop else None
+            materialFilter(detectedInfo, detail_img, item_img, rawDetectedInfo, debug_info)
             if not self.material_id % self.game_info.art_cols:
                 self.log(f"扫描: {self.material_id}")
                 self.log(f"  - 保存: {self.saved_material}")

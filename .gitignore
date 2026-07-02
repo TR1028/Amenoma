@@ -15,5 +15,8 @@ ArtScanner/artifacts/**
 /model_trainer/.ipynb_checkpoints/
 /model_trainer/train/
 .idea/**
+.venv/
 
 /ArtScanner/materials/
+
+MATERIAL_SCAN_OCR_GOOD_INVESTIGATION.md

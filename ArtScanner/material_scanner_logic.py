@@ -1,9 +1,23 @@
+import os
 import time
 
 import art_scanner_logic
 import mouse
 from utils import captureWindow
 from typing import Tuple
+
+
+def getMaterialItemCoord(game_info, row: int, col: int, lastrow=False) -> Tuple[int, int, int, int]:
+    x1 = int(game_info.first_art_x + (game_info.art_width + game_info.art_gap_x) * col)
+    y1 = int(game_info.first_art_y + (game_info.art_height + game_info.art_gap_y) * row)
+    x2 = int(game_info.first_art_x + (game_info.art_width + game_info.art_gap_x) * col + game_info.art_width)
+    y2 = int(game_info.first_art_y + (game_info.art_height + game_info.art_gap_y) * row + game_info.art_height)
+
+    if lastrow:
+        y1 -= game_info.lastrow_offset
+        y2 -= game_info.lastrow_offset
+
+    return x1, y1, x2, y2
 
 
 class MaterialScannerLogic:
@@ -38,6 +52,8 @@ class MaterialScannerLogic:
         time.sleep(0.5)
 
     def scanRows(self, rows, callback) -> bool:
+        debug_material_crop = os.environ.get("AMENOMA_DEBUG_MATERIAL_CROP") == "1"
+
         def getItemCoord(row: int, col: int, lastrow=False) -> Tuple[int, int, int, int]:
             """
             get the coord of the item
@@ -46,17 +62,7 @@ class MaterialScannerLogic:
             :param lastrow:
             :return: (x1, y1, x2, y2): Tuple[int, int, int, int]
             """
-            g = self.scanner.game_info
-            x1 = int(g.first_art_x + (g.art_width + g.art_gap_x) * col)
-            y1 = int(g.first_art_y + (g.art_height + g.art_gap_y) * row)
-            x2 = int(g.first_art_x + (g.art_width + g.art_gap_x) * col + g.art_width)
-            y2 = int(g.first_art_y + (g.art_height + g.art_gap_y) * row + g.art_height)
-
-            if lastrow:
-                y1 -= g.lastrow_offset
-                y2 -= g.lastrow_offset
-
-            return x1, y1, x2, y2
+            return getMaterialItemCoord(self.scanner.game_info, row, col, lastrow)
 
         last_row = rows[0] != 0
         rows = list(rows)
@@ -81,8 +87,19 @@ class MaterialScannerLogic:
                         self.scanner.game_info.art_info_top,
                         self.scanner.game_info.art_info_left + self.scanner.game_info.art_info_width,
                         self.scanner.game_info.art_info_top + self.scanner.game_info.art_info_height))
+                    item_coord = getItemCoord(art_row, art_col, last_row)
                     item_img = captureWindow(self.scanner.game_info.hwnd,
-                                             getItemCoord(art_row, art_col, last_row))
+                                             item_coord)
+                    if debug_material_crop:
+                        debug_info = {
+                            "row": art_row,
+                            "col": art_col,
+                            "rows": rows,
+                            "last_row": last_row,
+                            "item_coord": item_coord,
+                            "lastrow_offset": self.scanner.game_info.lastrow_offset,
+                            "lastrow_offset_applied": last_row,
+                        }
                     if art_col == self.scanner.game_info.art_cols - 1:
                         art_row += 1
                         art_col = 0
@@ -93,7 +110,10 @@ class MaterialScannerLogic:
                         mouse.move(self.scanner.game_info.left + art_center_x,
                                    self.scanner.game_info.top + art_center_y)
                         mouse.click()
-                    callback(detail_img, item_img)
+                    if debug_material_crop:
+                        callback(detail_img, item_img, debug_info)
+                    else:
+                        callback(detail_img, item_img)
                 else:
                     return False
         return True
