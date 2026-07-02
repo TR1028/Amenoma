@@ -16,6 +16,7 @@ ArtScanner/artifacts/**
 /model_trainer/train/
 .idea/**
 .venv/
+.venv38/
 
 /ArtScanner/materials/
 

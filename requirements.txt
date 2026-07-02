@@ -1,0 +1,12 @@
+tensorflow==2.3.0
+protobuf==3.20.3
+PyQt5==5.15.9
+Pillow==8.1.2
+mss==6.1.0
+pywin32==300
+mouse==0.7.1
+keyboard==0.13.5
+Levenshtein==0.13.0
+ZODB==5.5.1
+persistent==4.6.4
+transaction==2.4.0
