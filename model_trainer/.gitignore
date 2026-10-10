@@ -1,0 +1,4 @@
+# Exported runtime models / weights and training checkpoints (see README.md).
+/output/
+/train/
+__pycache__/

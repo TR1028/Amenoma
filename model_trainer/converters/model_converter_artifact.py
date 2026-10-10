@@ -1,70 +1,21 @@
-import os.path
+"""Export the CHS artifact weights as rcc/models_CHS/artifact_model_<version>.h5 (+ charset JSON).
 
-from tensorflow.keras.layers import Input, Reshape, Dense, Dropout, Bidirectional, LSTM
-from tensorflow.keras.layers.experimental.preprocessing import StringLookup
-from tensorflow.keras.models import Model
+7.x update: the model architecture, vocabulary (from the charset JSON written
+next to the checkpoints) and geometry come from train_model_artifact.SPEC /
+trainer_tf instead of being duplicated here; see model_converter.py.
+"""
+import os
+import sys
 
-from model_trainer.mobilenetv3 import MobileNetV3_Small
+_TRAINER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _TRAINER_DIR not in sys.path:
+    sys.path.insert(0, _TRAINER_DIR)
 
-import ArtScanner.ArtsInfo as Info
-
-import model_trainer.model_info as model_info
-
-Users = list(Info.UsersCHS.keys())
-
-characters = sorted(
-    [
-        *set(
-            "".join(
-                sum(Info.ArtNames, [])
-                + Info.TypeNames
-                + list(Info.MainAttrNames.values())
-                + list(Info.SubAttrNames.values())
-                + list(".,+%0123456789")
-                + list(Users)
-                + list("已装备")
-                # + list(MaterialsNameCHS)
-            )
-        )
-    ]
-)
-char_to_num = StringLookup(
-    vocabulary=list(characters), num_oov_indices=0, mask_token="")
-num_to_char = StringLookup(
-    vocabulary=char_to_num.get_vocabulary(), oov_token="", mask_token="", invert=True)
-
-width = 240
-height = 16
-max_length = 15
-
-input_shape = (width, height)
-
-input_img = Input(
-    shape=(input_shape[0], input_shape[1], 1), name="image", dtype="float32"
-)
-mobilenet = MobileNetV3_Small(
-    (input_shape[0], input_shape[1], 1), 0, alpha=1.0, include_top=False
-).build()
-x = mobilenet(input_img)
-new_shape = ((input_shape[0] // 8), (input_shape[1] // 8) * 576)
-x = Reshape(target_shape=new_shape, name="reshape")(x)
-x = Dense(96, activation="relu", name="dense1")(x)
-x = Dropout(0.2)(x)
-
-# RNNs
-x = Bidirectional(LSTM(192, return_sequences=True, dropout=0.25))(x)
-x = Bidirectional(LSTM(96, return_sequences=True, dropout=0.25))(x)
-
-# Output layer
-output = Dense(len(characters) + 2, activation="softmax", name="dense2")(x)
-
-# Define the model
-model = Model(inputs=[input_img], outputs=output, name="ocr_model_v1")
-
-model.load_weights(os.path.join("..", model_info.MODEL_DIR, model_info.ARTIFACTS_MODEL_NAME))
+import model_info  # noqa: E402
+import trainer_tf  # noqa: E402
+from train_model_artifact import SPEC  # noqa: E402
 
 
-def convert():
-    model.summary()
-    model.save(os.path.join(model_info.OUTPUT_DIR,
-                            f"artifact_model_{model_info.MODEL_TARGET_VERSION}.h5"))
+def convert(weights=None, out_dir=None, version=None, charset=None, weights_dir=None):
+    return trainer_tf.convert_checkpoint(SPEC, model_info.ARTIFACTS_MODEL_NAME, weights=weights, out_dir=out_dir,
+                                         version=version, charset=charset, weights_dir=weights_dir)
