@@ -5,13 +5,11 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import numpy as np
 from PIL import Image
-import MaterialInfo
 import logging
 from tensorflow import get_logger
 import tensorflow.keras.models
-from tensorflow.keras.layers.experimental.preprocessing import StringLookup
-from tensorflow.keras.backend import ctc_decode
-from tensorflow.strings import reduce_join
+
+import charset_util
 
 get_logger().setLevel(logging.ERROR)
 
@@ -30,30 +28,15 @@ class Config:
 class OCR:
     def __init__(self, model, scale_ratio=1):
         self.scale_ratio = scale_ratio
-        self.characters = sorted(
-            [
-                *set(
-                    "".join(
-                        list(MaterialInfo.MaterialsNameCHS)
-                        + list("0123456789")
-                    )
-                )
-            ]
-        )
-        # Mapping characters to integers
-        self.char_to_num = StringLookup(
-            vocabulary=list(self.characters), num_oov_indices=0, mask_token=""
-        )
-
-        # Mapping integers back to original characters
-        self.num_to_char = StringLookup(
-            vocabulary=self.char_to_num.get_vocabulary(), oov_token="", mask_token="", invert=True
-        )
-
-        self.width = 240
-        self.height = 16
-        self.max_length = 15
         self.model = tensorflow.keras.models.load_model(model)
+        # Vocabulary pinned per model (rcc/models_CHS/charset_chs_mat.json or <model>.charset.json)
+        # instead of being rebuilt from material_names_v*.json, see charset_util.
+        self.charset = charset_util.load_charset_for_model(self.model, model, lang="CHS", kind="material")
+        self.characters = self.charset.characters
+
+        self.width = self.charset.width
+        self.height = self.charset.height
+        self.max_length = self.charset.max_length
         # self.build_model(input_shape=(self.width, self.height))
         # self.model.load_weights(model_weight)
 
@@ -140,15 +123,5 @@ class OCR:
         return result
 
     def decode(self, pred):
-        input_len = np.ones(pred.shape[0]) * pred.shape[1]
-        # Use greedy search. For complex tasks, you can use beam search
-        results = ctc_decode(pred, input_length=input_len, greedy=True)[0][0][:, :self.max_length]
-        # Iterate over the results and get back the text
-        output_text = []
-
-        for res in results:
-            res = self.num_to_char(res)
-            res = reduce_join(res)
-            res = res.numpy().decode("utf-8")
-            output_text.append(res)
-        return output_text
+        # Greedy CTC decoding through the model's pinned charset (see ocr.OCR.decode).
+        return self.charset.greedy_decode(np.asarray(pred))

@@ -8,6 +8,7 @@ import persistent
 import transaction
 
 import ArtsInfo
+import postprocess
 import utils
 from utils import logger
 
@@ -53,17 +54,27 @@ class ArtifactStatType(Enum):
 
 
 class ArtifactStat:
-    def __init__(self, name, value, rarity=0, level=0, isMain=False):
-        name = ArtsInfo.AttrName2Ids_EN[name]
-        value = utils.decodeValue(value)
-        if type(value) == float and (name + '_PERCENT') in ArtsInfo.MainAttrNames_EN:
-            name += '_PERCENT'
+    def __init__(self, name, value, rarity=0, level=0, isMain=False, key=None):
+        """key: FIGHT_PROP_* stat type decided by postprocess (e.g. the main stat legal for the slot);
+        without it the type is guessed from the name and from the value being a percentage."""
+        if key is None:
+            name = ArtsInfo.AttrName2Ids_EN[name]
+            value = utils.decodeValue(value)
+            if type(value) == float and (name + '_PERCENT') in ArtsInfo.MainAttrNames_EN:
+                name += '_PERCENT'
+        else:
+            name = key
+            value = postprocess.try_decode_value(value, postprocess.is_percent_key(key))
+            if value is None and not isMain:
+                raise ValueError(f"bad value for {key}")
         self.type = getattr(ArtifactStatType, name)
         # self.value = value
         if isMain:
             try:
                 self.value = ArtsInfo.MainAttrValue[rarity][name][level]
-            except KeyError:
+            except (KeyError, IndexError):
+                if value is None:
+                    raise ValueError(f"bad value for {name}")
                 self.value = value
         else:
             self.value = value
@@ -102,6 +113,8 @@ class Artifact(persistent.Persistent):
                     i.get('Level', -1) == l + 1 and i.get('Rank', -1) == r], []) for r in range(1, 6)} for l in
         range(21)} for k in ArtsInfo.MainAttrNames_EN.keys()}
 
+    LANG = 'EN'  # language of the OCR texts (postprocess tables)
+
     def __init__(self, info, image):
         """
             info: dict with keys:
@@ -112,6 +125,11 @@ class Artifact(persistent.Persistent):
                 'main_attr_name': str, name of main stat
                 'main_attr_value': str/int/float, main stat value, example: '38.5%', '4,760', 144
                 'subattr_{i}': str, substat description, i could be 1-4, example: '暴击率+3.5%', '攻击力+130'
+                optional (set by ocr_EN.detect_info / postprocess.correct_artifact):
+                'main_stat_key': str, FIGHT_PROP_* main stat legal for the slot
+                'unactivated': list of 'subattr_{i}' keys that are 6.0 unactivated substats
+                'unactivated_substats': list of str, unactivated substat descriptions
+                'astral_mark': bool
             image: PIL.Image, screenshot of the artifact, will be shrinked to 300x512 to save space
         """
 
@@ -123,18 +141,56 @@ class Artifact(persistent.Persistent):
         self.level = utils.decodeValue(info['level'])
         self.rarity = info['star']
         self.locked = info['locked']
+        self.astral_mark = bool(info.get('astral_mark', False))
         self.equipped = (info['equipped']
                          if (info['equipped'] == "" or info['equipped'] == 'Traveler')
                          else ArtsInfo.UsersEN[info['equipped']])
+        main_key = info.get('main_stat_key')
+        if main_key is None:
+            # ATK / HP / DEF main stats are percentages on sands / goblet / circlet
+            main_key, _ = postprocess.resolve_main_stat(info['main_attr_name'], typeid, self.LANG)
         self.stat = ArtifactStat(
             info['main_attr_name'],
             info['main_attr_value'],
-            rarity=self.rarity, level=self.level, isMain=True)
-        self.substats = [ArtifactStat(*info[tag].split('+'))
-                         for tag in sorted(info.keys()) if "subattr_" in tag]
+            rarity=self.rarity, level=self.level, isMain=True, key=main_key)
+        # 6.0+: the greyed out "(unactivated)" substat has not been rolled yet, keep it apart
+        marked = set(info.get('unactivated') or [])
+        self.substats = [self.parseSubstat(info[tag])
+                         for tag in sorted(info.keys()) if tag.startswith("subattr_") and tag not in marked]
+        self.unactivated_substats = self.parseUnactivated(
+            list(info.get('unactivated_substats') or []) + [info[tag] for tag in sorted(marked) if tag in info])
         if image is not None:
             self.image = image.resize((300, 512))
         assert self.is_valid(), "Artifact attributes are not valid"
+
+    @classmethod
+    def parseSubstat(cls, text):
+        """'CRIT Rate+3.9%' (also without '+' / '%', or with the unactivated suffix) -> ArtifactStat"""
+        sub = postprocess.parse_substat(text, cls.LANG)
+        if sub is None:
+            raise ValueError(f"bad substat {text!r}")
+        return ArtifactStat(sub.name, sub.value, key=sub.key)
+
+    def parseUnactivated(self, texts):
+        """Unactivated substats that look right (a single roll, no duplicate); others are dropped with a
+        warning: a misread grey line must not cost the whole artifact."""
+        result = []
+        for text in texts:
+            try:
+                stat = self.parseSubstat(text)
+            except (ValueError, KeyError, AttributeError):
+                logger.warning(f"Dropped unactivated sub stat {text!r}: not recognised")
+                continue
+            rolls = self.__class__.rare_substat_ranges[stat.type].get(self.rarity, [])
+            if not any(stat.compare_value(v) == 0 for v in rolls):
+                logger.warning(f"Dropped unactivated sub stat {text!r}: not a single roll")
+            elif stat.type == self.stat.type or any(stat.type == s.type for s in self.substats + result):
+                logger.warning(f"Dropped unactivated sub stat {text!r}: duplicate stat")
+            elif len(self.substats) + len(result) >= 4:
+                logger.warning(f"Dropped unactivated sub stat {text!r}: too many sub stats")
+            else:
+                result.append(stat)
+        return result
 
     def is_valid(self):
         if self.level > ArtsInfo.RarityToMaxLvs[self.rarity - 1]:
@@ -219,26 +275,37 @@ class ArtDatabase:
             "source": "Amenoma",
             "artifacts": [],
         }
+
+        def good_substat(substat):
+            return {
+                "key": ArtsInfo.AttrNamesGOOD[substat.type.name],
+                "value": round(substat.value * 100, 1)
+                if ArtsInfo.AttrNamesGOOD[substat.type.name].endswith("_")
+                else substat.value,
+            }
+
         for art_id in range(self.root['size']):
             art: Artifact = self.root[str(art_id)]
+            if not 3 <= art.rarity <= 5:
+                # GO only knows 3-5 star artifacts (an invalid rarity is imported as 5 star)
+                logger.info(f"[GOOD] skipped a {art.rarity} star artifact: {art.name}")
+                continue
             res = {
                     "setKey": ArtsInfo.SetNamesGOOD[art.setid],
                     "slotKey": ArtsInfo.TypeNamesGOOD[art.type],
                     "level": art.level,
-                    "rarity": art.rarity if 3 <= art.rarity <= 5 else 0,
+                    "rarity": art.rarity,
                     "mainStatKey": ArtsInfo.AttrNamesGOOD[art.stat.type.name],
                     "location": art.equipped,
                     "lock": art.locked,
-                    "substats": [
-                        {
-                            "key": ArtsInfo.AttrNamesGOOD[substat.type.name],
-                            "value": round(substat.value * 100, 1)
-                            if ArtsInfo.AttrNamesGOOD[substat.type.name].endswith("_")
-                            else substat.value,
-                        }
-                        for substat in art.substats
-                    ]
+                    "substats": [good_substat(substat) for substat in art.substats]
                 }
+            # 6.0+ greyed out substat, see Genshin Optimizer's artifact schema
+            unactivated = getattr(art, 'unactivated_substats', None)
+            if unactivated:
+                res["unactivatedSubstats"] = [good_substat(substat) for substat in unactivated]
+            if getattr(art, 'astral_mark', False):
+                res["astralMark"] = True
             if not settings['exportLocation']:
                 del res['location']
             result['artifacts'].append(res)

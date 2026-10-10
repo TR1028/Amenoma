@@ -2,6 +2,7 @@ import os
 import time
 
 import art_scanner_logic
+import layout
 import mouse
 from utils import captureWindow
 from typing import Tuple
@@ -22,7 +23,9 @@ def getMaterialItemCoord(game_info, row: int, col: int, lastrow=False) -> Tuple[
 
 class MaterialScannerLogic:
     def __init__(self, game_info: art_scanner_logic.GameInfo):
-        self.scanner = art_scanner_logic.ArtScannerLogic(game_info)
+        # the material inventory keeps the legacy geometry (no filter bar above the grid)
+        grid = getattr(game_info, 'material_grid', None) or layout.GridLayout.for_materials(game_info.w, game_info.h)
+        self.scanner = art_scanner_logic.ArtScannerLogic(game_info, grid=grid)
 
     def interrupt(self):
         self.scanner.interrupt()

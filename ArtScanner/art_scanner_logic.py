@@ -5,6 +5,7 @@ import mouse
 import numpy as np
 import win32gui
 
+import layout
 from utils import captureWindow
 from utils import logger
 
@@ -74,11 +75,34 @@ class GameInfo:
         self.m_button = (self.left + 1270 * self.scale_ratio,
                            self.top + 70 * self.scale_ratio)
 
+        # The attributes above describe the material inventory (unchanged since 2.5, used by
+        # MaterialScannerLogic).  Since 5.2 the artifact inventory has a filter bar above the grid, so
+        # the artifact scanner uses its own geometry, see layout.py.
+        self.material_grid = layout.GridLayout.for_materials(self.w, self.h)
+        try:
+            overrides = layout.load_overrides()
+        except Exception as e:
+            logger.exception(e)
+            overrides = {}
+        if overrides:
+            logger.info(f"artifact layout overrides: {overrides}")
+        self.artifact_grid = layout.GridLayout.for_artifacts(self.w, self.h, overrides)
+        logger.info(f"{self.material_grid}")
+        logger.info(f"{self.artifact_grid}")
+
+
 class ArtScannerLogic:
-    def __init__(self, game_info):
+    def __init__(self, game_info, grid=None):
         self.game_info = game_info
+        # geometry of the grid to scan (artifact inventory unless told otherwise)
+        if grid is None:
+            grid = getattr(game_info, 'artifact_grid', None) or layout.GridLayout.for_artifacts(game_info.w, game_info.h)
+        self.grid = grid
         self.stopped = False
         self.avg_response_time = 1 / 60
+        # set by scanArtifacts, reported in the debug info of scanRows
+        self.page = 0
+        self.last_page_info = None
 
     def interrupt(self):
         self.stopped = True
@@ -92,11 +116,7 @@ class ArtScannerLogic:
             count += 1
             mouse.move(self.game_info.left + art_center_x, self.game_info.top + art_center_y)
             mouse.click()
-            pix = captureWindow(self.game_info.hwnd, (
-                art_center_x - self.game_info.art_width / 2 - self.game_info.art_expand,
-                art_center_y,
-                art_center_x - self.game_info.art_width / 2 - self.game_info.art_expand + 1.5,
-                art_center_y + 1.5))
+            pix = captureWindow(self.game_info.hwnd, self.grid.selection_probe(art_center_x, art_center_y))
             if condition(pix.getpixel((0, 0))):
                 self.avg_response_time = 0.5 * self.avg_response_time + 0.5 * (time.time() - start)
                 logger.info("waitSwitched: %d times, avg response time: %f" % (count, self.avg_response_time))
@@ -107,57 +127,62 @@ class ArtScannerLogic:
             if total_wait > max_wait:
                 return False
 
-    def getArtCenter(self, row, col):
-        art_center_x = self.game_info.first_art_x + (
-                self.game_info.art_width + self.game_info.art_gap_x) * col + self.game_info.art_width / 2
-        art_center_y = self.game_info.first_art_y + (
-                self.game_info.art_height + self.game_info.art_gap_y) * row + self.game_info.art_height / 5
-        return art_center_x, art_center_y
+    def getArtCenter(self, row, col, offset_y=0):
+        return self.grid.click_point(row, col, offset_y)
 
-    def scanRows(self, rows, callback):
+    def scanRows(self, rows, callback, offset_y=0, debug=False):
         '''
         callback: function to take in artifact image and do what ever you want
+        offset_y: the grid is scrolled up by this many pixels (last page, see lastPageRows)
+        debug: call callback(art_img, debug_info) with the grid position of the item
         '''
         rows = list(rows)
         if len(rows) < 1:
             return True
-        art_center_x, art_center_y = self.getArtCenter(rows[0], 0)
+        art_center_x, art_center_y = self.getArtCenter(rows[0], 0, offset_y)
         mouse.move(self.game_info.left + art_center_x, self.game_info.top + art_center_y)
         mouse.click()
         for art_row in rows:
-            for art_col in range(self.game_info.art_cols):
+            for art_col in range(self.grid.cols):
                 if self.stopped:
                     return False
-                if self.waitSwitched(*self.getArtCenter(art_row, art_col), min_wait=0.1, max_wait=3):
+                click = self.getArtCenter(art_row, art_col, offset_y)
+                if self.waitSwitched(*click, min_wait=0.1, max_wait=3):
                     art_img = captureWindow(self.game_info.hwnd, (
                         self.game_info.art_info_left,
                         self.game_info.art_info_top,
                         self.game_info.art_info_left + self.game_info.art_info_width,
                         self.game_info.art_info_top + self.game_info.art_info_height))
-                    if art_col == self.game_info.art_cols - 1:
+                    debug_info = {"page": self.page, "row": art_row, "col": art_col, "rows": rows,
+                                  "offset_y": round(offset_y, 2),
+                                  "click": [round(v, 1) for v in click],
+                                  "item_box": [round(v, 1) for v in self.grid.item_box(art_row, art_col, offset_y)],
+                                  "last_page": self.last_page_info}
+                    if art_col == self.grid.cols - 1:
                         art_row += 1
                         art_col = 0
                     else:
                         art_col += 1
                     if art_row in rows:
-                        art_center_x, art_center_y = self.getArtCenter(art_row, art_col)
+                        art_center_x, art_center_y = self.getArtCenter(art_row, art_col, offset_y)
                         mouse.move(self.game_info.left + art_center_x, self.game_info.top + art_center_y)
                         mouse.click()
-                    callback(art_img)
+                    if debug:
+                        callback(art_img, debug_info)
+                    else:
+                        callback(art_img)
                 else:
                     return False
         return True
 
+    def isKeypointOnLabel(self):
+        pix = captureWindow(self.game_info.hwnd, self.grid.keypoint_box())
+        return layout.is_label_pixel(pix.getpixel((0, 0)))
+
     def alignFirstRow(self):
-        mouse.move(self.game_info.left + self.game_info.first_art_x, self.game_info.top + self.game_info.first_art_y)
+        mouse.move(self.game_info.left + self.grid.first_x, self.game_info.top + self.grid.first_y)
         mouse.click()
-        pix = captureWindow(self.game_info.hwnd, (
-            self.game_info.scroll_fin_keypt_x,
-            self.game_info.scroll_fin_keypt_y,
-            self.game_info.scroll_fin_keypt_x + 1.5,
-            self.game_info.scroll_fin_keypt_y + 1.5))
-        if abs(pix.getpixel((0, 0))[0] - 233) > 5 or abs(pix.getpixel((0, 0))[1] - 229) > 5 or abs(
-                pix.getpixel((0, 0))[2] - 220) > 5:
+        if not self.isKeypointOnLabel():
             for _ in range(3):
                 mouse.wheel(1)
             time.sleep(0.1)
@@ -168,13 +193,7 @@ class ArtScannerLogic:
         rows_scrolled = 0
         lines_scrolled = 0
         while True:
-            pix = captureWindow(self.game_info.hwnd, (
-                self.game_info.scroll_fin_keypt_x,
-                self.game_info.scroll_fin_keypt_y,
-                self.game_info.scroll_fin_keypt_x + 1.5,
-                self.game_info.scroll_fin_keypt_y + 1.5))
-            if abs(pix.getpixel((0, 0))[0] - 233) > 5 or abs(pix.getpixel((0, 0))[1] - 229) > 5 or abs(
-                    pix.getpixel((0, 0))[2] - 220) > 5:
+            if not self.isKeypointOnLabel():
                 # if in_between_row==False:
                 #     print('到行之间了')
                 in_between_row = True
@@ -189,11 +208,7 @@ class ArtScannerLogic:
                     return rows_scrolled
             if lines_scrolled > max_scrolls:
                 return rows_scrolled
-            get_first_art = lambda: np.array(captureWindow(self.game_info.hwnd, (
-                self.game_info.first_art_x + self.game_info.art_width / 2 - 1,
-                self.game_info.first_art_y + self.game_info.art_height / 2,
-                self.game_info.first_art_x + self.game_info.art_width / 2 + 1,
-                self.game_info.first_art_y + self.game_info.art_height)))
+            get_first_art = lambda: np.array(captureWindow(self.game_info.hwnd, self.grid.first_item_probe()))
             first_art = get_first_art()
             for _ in range(7 if lines_scrolled == 0 and target_row > 0 else 1):
                 mouse.wheel(-1)
@@ -208,3 +223,70 @@ class ArtScannerLogic:
                     break
                 time.sleep(interval)
                 total_waited += interval
+
+    def locateRows(self):
+        """Measure the current row offset from the label strips, see layout.detect_row_offset."""
+        box = self.grid.label_column_box()
+        column = np.array(captureWindow(self.game_info.hwnd, box))[:, 0, :3]
+        return layout.detect_row_offset(self.grid, column, box[1], keypoint_is_label=self.isKeypointOnLabel())
+
+    def lastPageRows(self, rows_scrolled):
+        """The list stopped scrolling after ``rows_scrolled`` rows (< grid.rows): end of the inventory.
+
+        The last scroll usually stops between two rows, so the remaining rows are not where
+        getArtCenter expects them, and one more row may have become visible below the page.
+        :return: (rows to scan, offset_y for scanRows, info dict for logging)
+        """
+        first_new = self.grid.rows - rows_scrolled
+        detected = self.locateRows()
+        if detected is not None:
+            offset_y, visible = detected
+            source = "detected"
+        else:
+            # no label strip found: aligned if the keypoint is on a label, else use the estimate
+            offset_y = 0 if self.isKeypointOnLabel() else self.grid.lastrow_offset
+            visible = self.grid.visible_rows(offset_y)
+            source = "estimated"
+        rows = [r for r in visible if r >= first_new]
+        info = {"rows_scrolled": rows_scrolled, "first_new_row": first_new, "offset_y": round(offset_y, 1),
+                "visible_rows": visible, "rows": rows, "source": source}
+        logger.info(f"last page: {info}")
+        return rows, offset_y, info
+
+    def scanArtifacts(self, callback, interval=0.05, debug=False, on_page=None):
+        """Scan the whole inventory, page by page (call alignFirstRow first).
+
+        Every page scans the ``grid.rows`` fully visible rows and scrolls that many rows down.  When
+        the list stops early (end of the inventory) the remaining rows are located with
+        lastPageRows and scanned once.
+
+        :param callback: callback(art_img) or, with ``debug``, callback(art_img, debug_info)
+        :param interval: polling interval while scrolling (the "delay" setting)
+        :param on_page: optional on_page(page, rows, offset_y, last_page_info) called before a page
+                        is scanned (debug dump)
+        :return: why the scan ended: "stopped" (interrupted), "no_item" (a click did not select an
+                 item, i.e. an empty slot) or "end" (last page done)
+        """
+        rows = self.grid.rows
+        self.page = 0
+        self.last_page_info = None
+        while True:
+            if self.stopped:
+                return "stopped"
+            if on_page is not None:
+                on_page(self.page, list(range(rows)), 0, None)
+            if not self.scanRows(range(rows), callback, debug=debug):
+                return "stopped" if self.stopped else "no_item"
+            scrolled = self.scrollToRow(rows, max_scrolls=20, extra_scroll=int(rows > 5), interval=interval)
+            self.page += 1
+            if scrolled >= rows:
+                continue
+            last_rows, offset_y, info = self.lastPageRows(scrolled)
+            self.last_page_info = info
+            if on_page is not None:
+                on_page(self.page, last_rows, offset_y, info)
+            if last_rows and not self.stopped:
+                if not self.scanRows(last_rows, callback, offset_y=offset_y, debug=debug):
+                    return "stopped" if self.stopped else "no_item"
+            return "stopped" if self.stopped else "end"
+

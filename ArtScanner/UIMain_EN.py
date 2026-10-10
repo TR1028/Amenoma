@@ -14,8 +14,10 @@ from PyQt5.QtWidgets import (QMainWindow, QApplication, QDialog,
                              QWidget, QCheckBox, QHBoxLayout, QMessageBox)
 
 import ArtsInfo
+import artifact_debug
 import ocr_EN
 import ocr_m_EN
+import postprocess
 import utils
 import config
 import ToolboxMain_EN
@@ -538,13 +540,13 @@ class Worker(QObject):
         else:
             self.bundle_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
         self.model = ocr_EN.OCR(model=os.path.join(self.bundle_dir,
-                                                   f'rcc/models_EN/artifact_model_EN_{config.TARGET_VERSION}.h5'))
+                                                   f'rcc/models_EN/artifact_model_EN_{config.MODEL_VERSION}.h5'))
 
         self.log('Initialize is finished.')
         if self.isWindowCaptured:
             self.log('The window has been captured, '
                      'please check that the number of rows and columns is correct before start scanning.')
-            self.log(f'rows: {self.game_info.art_rows} , columns: {self.game_info.art_cols}')
+            self.log(f'rows: {self.game_info.artifact_grid.rows} , columns: {self.game_info.artifact_grid.cols}')
             self.log("If that's wrong, please change the resolution and try again")
         else:
             self.error('The window is not captured, please recapture the window before start scanning.')
@@ -570,7 +572,7 @@ class Worker(QObject):
         else:
             self.bundle_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
         self.model_m = ocr_m_EN.OCR(model=os.path.join(self.bundle_dir,
-                                                       f'rcc/models_EN/material_model_EN_{config.TARGET_VERSION}.h5'))
+                                                       f'rcc/models_EN/material_model_EN_{config.MODEL_VERSION}.h5'))
 
         self.log('Initializing finished')
         if self.isWindowCaptured:
@@ -897,7 +899,6 @@ class Worker(QObject):
         self.log('Complete, scan will start now.')
         time.sleep(0.5)
 
-        start_row = 0
         self.art_id = 0
         self.saved = 0
         self.skipped = 0
@@ -905,43 +906,59 @@ class Worker(QObject):
         self.star_dist = [0, 0, 0, 0, 0]
         self.star_dist_saved = [0, 0, 0, 0, 0]
 
-        def autoCorrect(detected_info):
-            detected_info['name'] = utils.name_auto_correct_EN(detected_info['name'])
-            detected_info['type'] = utils.type_auto_correct_EN(detected_info['type'])
-            detected_info['equipped'] = utils.equipped_auto_correct_EN(detected_info['equipped'])
-            detected_info['setid'] = [i for i, v in enumerate(
-                ArtsInfo.ArtNames_EN) if detected_info['name'] in v][0]
-            detected_info['main_attr_name'] = utils.attr_auto_correct_EN(detected_info['main_attr_name'])
-            for tag in sorted(detected_info.keys()):
-                if "subattr_" in tag:
-                    info = detected_info[tag].split('+')
-                    detected_info[tag] = utils.attr_auto_correct_EN(info[0]) + "+" + info[1]
+        debug_dump = None
+        if artifact_debug.enabled():
+            try:
+                debug_dump = artifact_debug.ArtifactScanDebugDump(
+                    'artifacts', self.game_info, artScanner.grid, self.model, ocr_EN.Config,
+                    capture=lambda: utils.captureWindow(self.game_info.hwnd), logger=self.logger)
+                self.logger.info(f"[ArtifactDebug] Debug crop dump enabled. path={debug_dump.dir}")
+            except Exception as e:
+                self.logger.exception(e)
 
-        def artFilter(detected_info, art_img):
+        def autoCorrect(detected_info):
+            # validates the OCR result against the game data, raises postprocess.RecognitionError
+            # instead of snapping unknown names to the closest known one
+            warnings = postprocess.correct_artifact(detected_info, 'EN')
+            for w in warnings:
+                self.logger.info(f"[AutoCorrect] {w}")
+            return warnings
+
+        def artFilter(detected_info, art_img, raw_detected_info=None, debug_info=None):
             # 0 - init value
             # 1 - skipped
             # 2 - saved
             # 3 - failed
             status = 0
+            warnings = []
+            error = None
 
-            self.star_dist[detected_info['star'] - 1] += 1
+            if detected_info.get('star') in (1, 2, 3, 4, 5):
+                self.star_dist[detected_info['star'] - 1] += 1
 
             try:
-                autoCorrect(detected_info)
+                warnings = autoCorrect(detected_info)
                 self.log(f"Detected [{detected_info['name']}]")
-                if detected_info['name'] in ArtsInfo.ArtNames_EN[-1]:
+                if detected_info['consumable']:
                     self.log('[Enhancement Materials] Skipped')
                     self.skipped += 1
                     status = 1
                 else:
                     detectedLevel = utils.decodeValue(detected_info['level'])
                     detectedStar = utils.decodeValue(detected_info['star'])
+            except postprocess.RecognitionError as v:
+                self.error(f"Not recognized: {v}")
+                self.logger.warning(f"[AutoCorrect] id: {self.art_id + 1} {v} detected info: {detected_info}")
+                self.failed += 1
+                status = 3
+                error = str(v)
             except Exception as v:
                 self.error("Failed to process numbers.")
                 self.logger.warning(f"[DecodeValue] error occurred")
                 self.logger.exception(v)
                 self.failed += 1
                 status = 3
+                error = repr(v)
 
             if status != 0:
                 pass
@@ -973,6 +990,9 @@ class Worker(QObject):
                 status = 3
                 self.failed += 1
             self.art_id += 1
+            if debug_dump is not None:
+                debug_dump.artifact(self.art_id, art_img, raw_detected_info, dict(detected_info), debug_info,
+                                    status, warnings, error)
             saveImg(detected_info, art_img, status)
 
         def saveImg(detected_info, art_img, status):
@@ -995,27 +1015,24 @@ class Worker(QObject):
                     with open(f"artifacts/fail_{self.art_id}.json", "wb") as f:
                         f.write(s.encode('utf-8'))
 
-        def artscannerCallback(art_img):
+        def artscannerCallback(art_img, debug_info=None):
             detectedInfo = self.model.detect_info(art_img)
             utils.logger.info(f"Detected info: {detectedInfo}")
-            artFilter(detectedInfo, art_img)
-            if not self.art_id % self.game_info.art_cols:
+            rawDetectedInfo = dict(detectedInfo) if debug_dump is not None else None
+            artFilter(detectedInfo, art_img, rawDetectedInfo, debug_info)
+            if not self.art_id % artScanner.grid.cols:
                 self.log(f"Scanned: {self.art_id}")
                 self.log(f"  - Saved: {self.saved}")
                 self.log(f"  - Failed: {self.failed}")
                 self.log(f"  - Skipped: {self.skipped}")
 
         try:
-            while True:
-                if artScanner.stopped or not artScanner.scanRows(rows=range(start_row, self.game_info.art_rows),
-                                                                 callback=artscannerCallback) or start_row != 0:
-                    break
-                start_row = self.game_info.art_rows - artScanner.scrollToRow(self.game_info.art_rows, max_scrolls=20,
-                                                                             extra_scroll=int(
-                                                                                 self.game_info.art_rows > 5),
-                                                                             interval=self.detectSettings['delay'])
-                if start_row == self.game_info.art_rows:
-                    break
+            # 4 fully visible rows per page on 16:9 since the 5.2 filter bar; the last page is
+            # located from the level label strips, see ArtScannerLogic.lastPageRows
+            result = artScanner.scanArtifacts(artscannerCallback, interval=self.detectSettings['delay'],
+                                              debug=debug_dump is not None,
+                                              on_page=debug_dump.page if debug_dump is not None else None)
+            self.logger.info(f"[ScanArts] finished: {result}, last page: {artScanner.last_page_info}")
             if artScanner.stopped:
                 self.log('Interrupted')
             else:
@@ -1027,7 +1044,8 @@ class Worker(QObject):
 
         if self.saved != 0:
             if info['ExtraSettings']['ExportAllFormats']:
-                list(map(lambda exp, name: exp(name), exporter, export_name))
+                for exp, name in zip(exporter, export_name):
+                    exp({"path": name, "exportLocation": info['ExtraSettings']['ExportLocationField']})
             else:
                 self.log(f"File exported as: {export_name[info['exporter']]}")
                 exporter[info['exporter']]({"path": export_name[info['exporter']],

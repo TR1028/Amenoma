@@ -6,7 +6,9 @@ import time
 
 import mouse
 
+import config
 import ocr
+import postprocess
 from art_saver import ArtDatabase
 from art_scanner_logic import ArtScannerLogic, GameInfo
 from utils import decodeValue, findWindowsByName, calcFormatWidth, setWindowToForeground
@@ -96,8 +98,8 @@ game_info.calculateCoordinates()
 # margin near level number, color=233,229,220
 
 # initialization
-ocr_model = ocr.OCR(scale_ratio=game_info.scale_ratio, model_weight=os.path.join(bundle_dir,
-                                                                                 '../model_trainer/weights-improvement-55-1.00.hdf5'))
+ocr_model = ocr.OCR(model=os.path.join(bundle_dir, f'rcc/models_CHS/artifact_model_{config.MODEL_VERSION}.h5'),
+                    scale_ratio=game_info.scale_ratio)
 art_id = 0
 saved = 0
 skipped = 0
@@ -109,16 +111,13 @@ os.makedirs('artifacts', exist_ok=True)
 
 input('请打开圣遗物背包界面，最好翻到圣遗物列表最上面。按回车继续')
 print('---------------------------------')
-if game_info.incomplete_lastrow:
-    input(f'检测到圣遗物背包有{game_info.art_rows}行{game_info.art_cols}列，但最后一行不完整可能会影响自动翻页效果，建议更改分辨率到16:9')
-else:
-    input(f'自动判断圣遗物背包有{game_info.art_rows}行{game_info.art_cols}列，请务必确认是否正确！！错误请退出并更改分辨率后尝试')
+input(f'自动判断圣遗物背包有{game_info.artifact_grid.rows}行{game_info.artifact_grid.cols}列，请务必确认是否正确！！错误请退出并更改分辨率后尝试')
 print('---------------------------------')
 input('运行期间请保持原神在前台，请勿遮挡窗口或操作鼠标，按鼠标中键停止。按回车继续')
 input('开始后将尝试自动对齐第一行以方便识别，若对齐结果有误，请立刻按中键停止。按回车继续')
 print('---------------------------------')
 if input('是否进行高级设置，例如等级过滤，稀有度过滤，翻页延迟，导出格式，确认请输入y：').strip().lower() == 'y':
-    export_type = input('请输入需要的导出格式，0=莫娜的占卜铺（回车默认值），1=MingyuLab。')
+    export_type = input('请输入需要的导出格式，0=莫娜的占卜铺（回车默认值），1=MingyuLab，2=GOOD。')
     level_threshold = input('请输入圣遗物等级阈值(0-20)(比如：16，则仅将保存16级及以上的圣遗物信息)。直接按回车则默认保存所有圣遗物信息。')
     rarity_threshold = input('请输入圣遗物星级阈值(1-5)(比如：5，则仅将保存5星的圣遗物信息)。直接按回车则默认保存所有圣遗物信息。')
     scroll_interval = input('请输入翻页时的检测延迟（秒），数值越大翻页速度越慢，可以解决一些翻页时的检测BUG，直接回车则为默认值0.05。')
@@ -130,7 +129,7 @@ setWindowToForeground(hwnd)
 time.sleep(5)
 
 art_scanner = ArtScannerLogic(game_info)
-art_data = ArtDatabase('artifacts.dat')
+art_data = ArtDatabase()
 
 try:
     level_threshold = int(level_threshold)
@@ -145,8 +144,8 @@ try:
 except:
     scroll_interval = 0.05
 try:
-    exporter = [art_data.exportGenshinArtJSON, art_data.exportGenmoCalcJSON][int(export_type)]
-    export_name = ['artifacts.genshinart.json', 'artifacts.mingyulab.json'][int(export_type)]
+    exporter = [art_data.exportGenshinArtJSON, art_data.exportGenmoCalcJSON, art_data.exportGOODJSON][int(export_type)]
+    export_name = ['artifacts.genshinart.json', 'artifacts.mingyulab.json', 'artifacts.GOOD.json'][int(export_type)]
 except:
     exporter = art_data.exportGenshinArtJSON
     export_name = 'artifacts.genshinart.json'
@@ -157,7 +156,6 @@ print('正在自动对齐')
 art_scanner.alignFirstRow()
 print('对齐完成，即将开始扫描')
 time.sleep(0.5)
-start_row = 0
 
 
 def artscannerCallback(art_img):
@@ -167,10 +165,19 @@ def artscannerCallback(art_img):
     global failed
     global star_dist
     info = ocr_model.detect_info(art_img)
-    star_dist[info['star'] - 1] += 1
-    if decodeValue(info['level']) < level_threshold or decodeValue(info['star']) < rarity_threshold:
+    if info['star'] in (1, 2, 3, 4, 5):
+        star_dist[info['star'] - 1] += 1
+    try:
+        postprocess.correct_artifact(info, 'CHS')
+        ok = True
+    except postprocess.RecognitionError as e:
+        info['error'] = str(e)
+        ok = False
+    if ok and info['consumable']:
         skipped += 1
-    elif art_data.add(info, art_img):
+    elif ok and (info['level'] < level_threshold or info['star'] < rarity_threshold):
+        skipped += 1
+    elif ok and art_data.add(info, art_img):
         saved += 1
         star_dist_saved[info['star'] - 1] += 1
         # art_img.save(f'artifacts/{art_id}.png')
@@ -188,19 +195,11 @@ def artscannerCallback(art_img):
 
 
 try:
-    while True:
-        if art_scanner.stopped or not art_scanner.scanRows(rows=range(start_row, game_info.art_rows),
-                                                           callback=artscannerCallback) or start_row != 0:
-            break
-        start_row = game_info.art_rows - art_scanner.scrollToRow(game_info.art_rows, max_scrolls=20,
-                                                                 extra_scroll=int(game_info.art_rows > 5),
-                                                                 interval=scroll_interval)
-        if start_row == game_info.art_rows:
-            break
+    result = art_scanner.scanArtifacts(artscannerCallback, interval=scroll_interval)
     print()
     if art_scanner.stopped:
         print("用户已中断扫描")
-    elif start_row != 0:
+    elif result == "end":
         print("没有检测到下一页圣遗物，自动终止")
     else:
         print("在最后点击位置未检测到圣遗物，自动终止")
@@ -208,7 +207,7 @@ except Exception as e:
     print()
     print(f"因为\"{repr(e)}\"而意外停止扫描，将保存已扫描的圣遗物信息")
 if saved != 0:
-    exporter(export_name)
+    exporter({"path": export_name, "exportLocation": True})
 print(f'总计扫描了{skipped + saved}/{art_id}个圣遗物，保存了{saved}个到{export_name}，失败了{failed}个')
 print('无效识别/失败结果请到artifacts路径中查看')
 print('----------------------------')

@@ -5,13 +5,12 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import numpy as np
 from PIL import Image
-import ArtsInfo
 import logging
 from tensorflow import get_logger
 import tensorflow.keras.models
-from tensorflow.keras.layers.experimental.preprocessing import StringLookup
-from tensorflow.keras.backend import ctc_decode
-from tensorflow.strings import reduce_join
+
+import charset_util
+import panel_detect
 
 get_logger().setLevel(logging.ERROR)
 
@@ -32,41 +31,32 @@ class Config:
     subattr_3_coords = [67, 584, 560, 624]
     subattr_4_coords = [67, 636, 560, 676]
     equipped_coords = [105, 1060, 500, 1100]
-    lock_coords = [570, 405, 620, 455]
+    # 5.2+: the lock button moved left (Inventory_Kamera: x 0.855 -> 0.75 of the panel width, centre
+    # ~ x 506) and the new Astral Mark button sits at the old lock position ([570, 405, 620, 455]).
+    # Both boxes are generous search regions for the coloured glyph of the active state
+    # (red padlock / golden star), see panel_detect.
+    lock_coords = [450, 385, 575, 475]
+    astral_mark_coords = [525, 385, 650, 475]
 
 
 class OCR:
     def __init__(self, model, scale_ratio=1):
         self.scale_ratio = scale_ratio
-        self.characters = sorted(
-            [
-                *set(
-                    "".join(
-                        sum(ArtsInfo.ArtNames, [])
-                        + ArtsInfo.TypeNames
-                        + list(ArtsInfo.MainAttrNames.values())
-                        + list(ArtsInfo.SubAttrNames.values())
-                        + list(".,+%0123456789")
-                        + list(ArtsInfo.UsersCHS)
-                        + list("已装备")
-                    )
-                )
-            ]
-        )
-        # Mapping characters to integers
-        self.char_to_num = StringLookup(
-            vocabulary=list(self.characters), num_oov_indices=0, mask_token=""
-        )
-
-        # Mapping integers back to original characters
-        self.num_to_char = StringLookup(
-            vocabulary=self.char_to_num.get_vocabulary(), oov_token="", mask_token="", invert=True
-        )
-
-        self.width = 240
-        self.height = 16
-        self.max_length = 15
         self.model = tensorflow.keras.models.load_model(model)
+        # The vocabulary is pinned per model (rcc/models_CHS/charset_chs_art.json or
+        # <model>.charset.json) instead of being rebuilt from the data tables: adding new sets /
+        # characters to ArtsInfo would otherwise shift the index -> character mapping of the model.
+        self.charset = charset_util.load_charset_for_model(self.model, model, lang="CHS", kind="artifact")
+        self.characters = self.charset.characters
+        # 6.0 grey "（待激活）" substat lines are only read by models that know the marker
+        self.reads_unactivated = charset_util.can_read_unactivated(self.characters, "CHS")
+        if not self.reads_unactivated:
+            logging.getLogger().info("OCR model vocabulary has no '待激活': grey (unactivated) substat "
+                                     "lines are skipped")
+
+        self.width = self.charset.width
+        self.height = self.charset.height
+        self.max_length = self.charset.max_length
         # self.build_model(input_shape=(self.width, self.height))
         # self.model.load_weights(model_weight)
 
@@ -74,42 +64,49 @@ class OCR:
         self.scale_ratio = scaleRatio
 
     def detect_info(self, art_img):
-        info = self.extract_art_info(art_img)
+        info, unactivated = self.analyze_panel(art_img)
+        keys = sorted(info.keys())
         x = np.concatenate([
             self.preprocess(info[key]).T[None, :, :, None]
-            for key in sorted(info.keys())], axis=0)
+            for key in keys], axis=0)
         y = self.model.predict(x)
         y = self.decode(y)
-        return {**{key: v for key, v in zip(sorted(info.keys()), y)},
+        astral_mark = self.detect_astral_mark(art_img)
+        return {**{key: v for key, v in zip(keys, y)},
                 **{'star': self.detect_star(art_img),
-                    'locked': self.detect_lock(art_img)}}
+                   # marking an artifact with the Astral Mark always locks it
+                   'locked': self.detect_lock(art_img) or astral_mark,
+                   'astral_mark': astral_mark,
+                   # substat keys whose line is the grey 6.0 "待激活" (unactivated) substat
+                   'unactivated': unactivated}}
 
     def extract_art_info(self, art_img):
-        name = art_img.crop([i * self.scale_ratio for i in Config.name_coords])
-        type = art_img.crop([i * self.scale_ratio for i in Config.type_coords])
-        main_attr_name = art_img.crop([i * self.scale_ratio for i in Config.main_attr_name_coords])
-        main_attr_value = art_img.crop([i * self.scale_ratio for i in Config.main_attr_value_coords])
-        level = art_img.crop([i * self.scale_ratio for i in Config.level_coords])
-        subattr_1 = art_img.crop([i * self.scale_ratio for i in Config.subattr_1_coords])  # [73, 83, 102]
-        subattr_2 = art_img.crop([i * self.scale_ratio for i in Config.subattr_2_coords])
-        subattr_3 = art_img.crop([i * self.scale_ratio for i in Config.subattr_3_coords])
-        subattr_4 = art_img.crop([i * self.scale_ratio for i in Config.subattr_4_coords])
-        equipped = art_img.crop([i * self.scale_ratio for i in Config.equipped_coords])
-        if np.all(np.abs(np.array(subattr_1, np.float) - [[[73, 83, 102]]]).max(axis=-1) > 25):
-            del subattr_1
-            del subattr_2
-            del subattr_3
-            del subattr_4
-        elif np.all(np.abs(np.array(subattr_2, np.float) - [[[73, 83, 102]]]).max(axis=-1) > 25):
-            del subattr_2
-            del subattr_3
-            del subattr_4
-        elif np.all(np.abs(np.array(subattr_3, np.float) - [[[73, 83, 102]]]).max(axis=-1) > 25):
-            del subattr_3
-            del subattr_4
-        elif np.all(np.abs(np.array(subattr_4, np.float) - [[[73, 83, 102]]]).max(axis=-1) > 25):
-            del subattr_4
-        return {key: value for key, value in locals().items() if key not in ['art_img', 'self']}
+        return self.analyze_panel(art_img)[0]
+
+    def analyze_panel(self, art_img):
+        """Crop the text fields of the detail panel.
+
+        :return: (crops, unactivated) - crops: dict key -> PIL image of every field to OCR;
+                 unactivated: list of 'subattr_N' keys shown as unactivated (6.0+, grey text).  Their
+                 crop is only included if the model can read the "（待激活）" marker.
+        """
+        s = self.scale_ratio
+        crops = {
+            'name': art_img.crop([i * s for i in Config.name_coords]),
+            'type': art_img.crop([i * s for i in Config.type_coords]),
+            'main_attr_name': art_img.crop([i * s for i in Config.main_attr_name_coords]),
+            'main_attr_value': art_img.crop([i * s for i in Config.main_attr_value_coords]),
+            'level': art_img.crop([i * s for i in Config.level_coords]),
+            'equipped': art_img.crop([i * s for i in Config.equipped_coords]),
+        }
+        lines = [art_img.crop([i * s for i in coords]) for coords in (  # text colour [73, 83, 102]
+            Config.subattr_1_coords, Config.subattr_2_coords, Config.subattr_3_coords, Config.subattr_4_coords)]
+        present, unactivated = panel_detect.split_substat_lines(lines, s)
+        for number in present:
+            if number in unactivated and not self.reads_unactivated:
+                continue  # dropped like in v3.4: the old model misreads the marker
+            crops['subattr_%d' % number] = lines[number - 1]
+        return crops, ['subattr_%d' % number for number in unactivated]
 
     def detect_star(self, art_img):
         star = art_img.crop([i * self.scale_ratio for i in Config.star_coords])
@@ -119,11 +116,10 @@ class OCR:
         return round(coef)
 
     def detect_lock(self, img) -> bool:
-        lock = img.crop([i * self.scale_ratio for i in Config.lock_coords])
-        result = self.to_gray(lock)
-        result = self.normalize(result, auto_inverse=False)
-        result = np.where((result < 0.5), 0, 1)
-        return bool(np.add.reduce(np.add.reduce(result)) < 500)
+        return panel_detect.detect_lock(img, Config.lock_coords, self.scale_ratio)
+
+    def detect_astral_mark(self, img) -> bool:
+        return panel_detect.detect_astral_mark(img, Config.astral_mark_coords, self.scale_ratio)
 
     def to_gray(self, text_img):
         text_img = np.array(text_img)
@@ -183,18 +179,10 @@ class OCR:
         return result
 
     def decode(self, pred):
-        input_len = np.ones(pred.shape[0]) * pred.shape[1]
-        # Use greedy search. For complex tasks, you can use beam search
-        results = ctc_decode(pred, input_length=input_len, greedy=True)[0][0][:, :self.max_length]
-        # Iterate over the results and get back the text
-        output_text = []
-
-        for res in results:
-            res = self.num_to_char(res)
-            res = reduce_join(res)
-            res = res.numpy().decode("utf-8")
-            output_text.append(res)
-        return output_text
+        # Greedy CTC decoding (merge repeats, drop the blank = last class), truncated to max_length,
+        # then index -> character through the model's pinned charset.  Same result as
+        # ctc_decode(greedy=True) + the inverted StringLookup used before (see charset_util).
+        return self.charset.greedy_decode(np.asarray(pred))
 
     # def build_model(self, input_shape):
     #     input_img = Input(

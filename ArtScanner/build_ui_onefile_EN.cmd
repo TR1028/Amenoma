@@ -1,14 +1,17 @@
-set TARGET_VERSION=3.4.0
-set DICT_TARGET_VERSION=v34
+rem MODEL_VERSION / DATA_VERSION must match config.py
+set MODEL_VERSION=3.4.0
+set DATA_VERSION=v71
 
 pyinstaller -w -F ^
---add-data "rcc/models_EN/artifact_model_EN_%TARGET_VERSION%.h5;./rcc/models_EN" ^
---add-data "rcc/models_EN/material_model_EN_%TARGET_VERSION%.h5;./rcc/models_EN" ^
+--add-data "rcc/models_EN/artifact_model_EN_%MODEL_VERSION%.h5;./rcc/models_EN" ^
+--add-data "rcc/models_EN/material_model_EN_%MODEL_VERSION%.h5;./rcc/models_EN" ^
+--add-data "rcc/models_EN/*.json;./rcc/models_EN" ^
 --add-data "Tools/ReliquaryLevelExcelConfigData.json;./Tools" ^
 --add-data "Tools/ReliquaryAffixExcelConfigData.json;./Tools" ^
 --add-data "rcc/genshin.ttf;./rcc" ^
---add-data "rcc/material_names_%DICT_TARGET_VERSION%.json;./rcc" ^
---add-data "rcc/char_map_%DICT_TARGET_VERSION%.json;./rcc" ^
+--add-data "rcc/material_names_%DATA_VERSION%.json;./rcc" ^
+--add-data "rcc/char_map_%DATA_VERSION%.json;./rcc" ^
+--add-data "rcc/artifact_sets_%DATA_VERSION%.json;./rcc" ^
 --hidden-import=h5py ^
 --hidden-import=h5py.defs ^
 --hidden-import=h5py.utils ^

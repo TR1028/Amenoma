@@ -1,0 +1,1355 @@
+{
+  "target_version": "7.1.0",
+  "generator": "ArtScanner/Tools/update_game_data.py",
+  "sources": {
+    "genshin-optimizer": "master"
+  },
+  "note": "Append-only: ArtsInfo appends these sets (in this order) after its hard-coded lists; set ids are list indices.",
+  "base_sets": 43,
+  "sets": [
+    {
+      "good": "NymphsDream",
+      "mona": "NymphsDream",
+      "mingyu": "nymphs_dream",
+      "name_chs": "水仙之梦",
+      "name_en": "Nymph's Dream",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "旅途中的鲜花",
+        "plume": "坏巫师的羽杖",
+        "sands": "水仙的时时刻刻",
+        "goblet": "勇者们的茶会",
+        "circlet": "恶龙的单片镜"
+      },
+      "pieces_en": {
+        "flower": "Odyssean Flower",
+        "plume": "Wicked Mage's Plumule",
+        "sands": "Nymph's Constancy",
+        "goblet": "Heroes' Tea Party",
+        "circlet": "Fell Dragon's Monocle"
+      },
+      "release_index": 43
+    },
+    {
+      "good": "VourukashasGlow",
+      "mona": "VourukashasGlow",
+      "mingyu": "vourukashas_glow",
+      "name_chs": "花海甘露之光",
+      "name_en": "Vourukasha's Glow",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "灵光源起之蕊",
+        "plume": "琦色灵彩之羽",
+        "sands": "久远花落之时",
+        "goblet": "无边酣乐之筵",
+        "circlet": "灵光明烁之心"
+      },
+      "pieces_en": {
+        "flower": "Stamen of Khvarena's Origin",
+        "plume": "Vibrant Pinion",
+        "sands": "Ancient Abscission",
+        "goblet": "Feast of Boundless Joy",
+        "circlet": "Heart of Khvarena's Brilliance"
+      },
+      "release_index": 44
+    },
+    {
+      "good": "MarechausseeHunter",
+      "mona": "MarechausseeHunter",
+      "mingyu": "marechaussee_hunter",
+      "name_chs": "逐影猎人",
+      "name_en": "Marechaussee Hunter",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "猎人的胸花",
+        "plume": "杰作的序曲",
+        "sands": "裁判的时刻",
+        "goblet": "遗忘的容器",
+        "circlet": "老兵的容颜"
+      },
+      "pieces_en": {
+        "flower": "Hunter's Brooch",
+        "plume": "Masterpiece's Overture",
+        "sands": "Moment of Judgment",
+        "goblet": "Forgotten Vessel",
+        "circlet": "Veteran's Visage"
+      },
+      "release_index": 45
+    },
+    {
+      "good": "GoldenTroupe",
+      "mona": "GoldenTroupe",
+      "mingyu": "golden_troupe",
+      "name_chs": "黄金剧团",
+      "name_en": "Golden Troupe",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "黄金乐曲的变奏",
+        "plume": "黄金飞鸟的落羽",
+        "sands": "黄金时代的先声",
+        "goblet": "黄金之夜的喧嚣",
+        "circlet": "黄金剧团的奖赏"
+      },
+      "pieces_en": {
+        "flower": "Golden Song's Variation",
+        "plume": "Golden Bird's Shedding",
+        "sands": "Golden Era's Prelude",
+        "goblet": "Golden Night's Bustle",
+        "circlet": "Golden Troupe's Reward"
+      },
+      "release_index": 46
+    },
+    {
+      "good": "SongOfDaysPast",
+      "mona": "SongOfDaysPast",
+      "mingyu": "song_of_days_past",
+      "name_chs": "昔时之歌",
+      "name_en": "Song of Days Past",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "昔时遗落之誓",
+        "plume": "昔时浮想之思",
+        "sands": "昔时回映之音",
+        "goblet": "昔时应许之梦",
+        "circlet": "昔时传奏之诗"
+      },
+      "pieces_en": {
+        "flower": "Forgotten Oath of Days Past",
+        "plume": "Recollection of Days Past",
+        "sands": "Echoing Sound From Days Past",
+        "goblet": "Promised Dream of Days Past",
+        "circlet": "Poetry of Days Past"
+      },
+      "release_index": 47
+    },
+    {
+      "good": "NighttimeWhispersInTheEchoingWoods",
+      "mona": "NighttimeWhispersInTheEchoingWoods",
+      "mingyu": "nighttime_whispers_in_the_echoing_woods",
+      "name_chs": "回声之林夜话",
+      "name_en": "Nighttime Whispers in the Echoing Woods",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "无私的妆饰花",
+        "plume": "诚恳的蘸水笔",
+        "sands": "忠实的砂时计",
+        "goblet": "慷慨的墨水瓶",
+        "circlet": "慈爱的淑女帽"
+      },
+      "pieces_en": {
+        "flower": "Selfless Floral Accessory",
+        "plume": "Honest Quill",
+        "sands": "Faithful Hourglass",
+        "goblet": "Magnanimous Ink Bottle",
+        "circlet": "Compassionate Ladies' Hat"
+      },
+      "release_index": 48
+    },
+    {
+      "good": "FragmentOfHarmonicWhimsy",
+      "mona": "FragmentOfHarmonicWhimsy",
+      "mingyu": "fragment_of_harmonic_whimsy",
+      "name_chs": "谐律异想断章",
+      "name_en": "Fragment of Harmonic Whimsy",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "谐律交响的前奏",
+        "plume": "古海玄幽的夜想",
+        "sands": "命途轮转的谐谑",
+        "goblet": "灵露倾洒的狂诗",
+        "circlet": "异想零落的圆舞"
+      },
+      "pieces_en": {
+        "flower": "Harmonious Symphony Prelude",
+        "plume": "Ancient Sea's Nocturnal Musing",
+        "sands": "The Grand Jape of the Turning of Fate",
+        "goblet": "Ichor Shower Rhapsody",
+        "circlet": "Whimsical Dance of the Withered"
+      },
+      "release_index": 49
+    },
+    {
+      "good": "UnfinishedReverie",
+      "mona": "UnfinishedReverie",
+      "mingyu": "unfinished_reverie",
+      "name_chs": "未竟的遐思",
+      "name_en": "Unfinished Reverie",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "暗结的明花",
+        "plume": "褪光的翠尾",
+        "sands": "举业的识刻",
+        "goblet": "筹谋的共樽",
+        "circlet": "失冕的宝冠"
+      },
+      "pieces_en": {
+        "flower": "Dark Fruit of Bright Flowers",
+        "plume": "Faded Emerald Tail",
+        "sands": "Moment of Attainment",
+        "goblet": "The Wine-Flask Over Which the Plan Was Hatched",
+        "circlet": "Crownless Crown"
+      },
+      "release_index": 50
+    },
+    {
+      "good": "ScrollOfTheHeroOfCinderCity",
+      "mona": "ScrollOfTheHeroOfCinderCity",
+      "mingyu": "scroll_of_the_hero_of_cinder_city",
+      "name_chs": "烬城勇者绘卷",
+      "name_en": "Scroll of the Hero of Cinder City",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "驯兽师的护符",
+        "plume": "巡山客的信标",
+        "sands": "秘术家的金盘",
+        "goblet": "游学者的爪杯",
+        "circlet": "魔战士的羽面"
+      },
+      "pieces_en": {
+        "flower": "Beast Tamer's Talisman",
+        "plume": "Mountain Ranger's Marker",
+        "sands": "Mystic's Gold Dial",
+        "goblet": "Wandering Scholar's Claw Cup",
+        "circlet": "Demon-Warrior's Feather Mask"
+      },
+      "release_index": 51
+    },
+    {
+      "good": "ObsidianCodex",
+      "mona": "ObsidianCodex",
+      "mingyu": "obsidian_codex",
+      "name_chs": "黑曜秘典",
+      "name_en": "Obsidian Codex",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "异种的期许",
+        "plume": "灵髓的根脉",
+        "sands": "夜域的迷思",
+        "goblet": "纷争的前宴",
+        "circlet": "诸圣的礼冠"
+      },
+      "pieces_en": {
+        "flower": "Reckoning of the Xenogenic",
+        "plume": "Root of the Spirit-Marrow",
+        "sands": "Myths of the Night Realm",
+        "goblet": "Pre-Banquet of the Contenders",
+        "circlet": "Crown of the Saints"
+      },
+      "release_index": 52
+    },
+    {
+      "good": "LongNightsOath",
+      "mona": "LongNightsOath",
+      "mingyu": "long_nights_oath",
+      "name_chs": "长夜之誓",
+      "name_en": "Long Night's Oath",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "执灯人的誓词",
+        "plume": "夜鸣莺的尾羽",
+        "sands": "不死者的哀铃",
+        "goblet": "未吹响的号角",
+        "circlet": "被浸染的缨盔"
+      },
+      "pieces_en": {
+        "flower": "Lightkeeper's Pledge",
+        "plume": "Nightingale's Tail Feather",
+        "sands": "Undying One's Mourning Bell",
+        "goblet": "A Horn Unwinded",
+        "circlet": "Dyed Tassel"
+      },
+      "release_index": 53
+    },
+    {
+      "good": "FinaleOfTheDeepGalleries",
+      "mona": "FinaleOfTheDeepGalleries",
+      "mingyu": "finale_of_the_deep_galleries",
+      "name_chs": "深廊终曲",
+      "name_en": "Finale of the Deep Galleries",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "深廊的回奏之歌",
+        "plume": "深廊的漫远之约",
+        "sands": "深廊的湮落之刻",
+        "goblet": "深廊的饫赐之宴",
+        "circlet": "深廊的遂失之冕"
+      },
+      "pieces_en": {
+        "flower": "Deep Gallery's Echoing Song",
+        "plume": "Deep Gallery's Distant Pact",
+        "sands": "Deep Gallery's Moment of Oblivion",
+        "goblet": "Deep Gallery's Bestowed Banquet",
+        "circlet": "Deep Gallery's Lost Crown"
+      },
+      "release_index": 54
+    },
+    {
+      "good": "NightOfTheSkysUnveiling",
+      "mona": "NightOfTheSkysUnveiling",
+      "mingyu": "night_of_the_skys_unveiling",
+      "name_chs": "穹境示现之夜",
+      "name_en": "Night of the Sky's Unveiling",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "渴真之花",
+        "plume": "深罪之羽",
+        "sands": "谕告之钟",
+        "goblet": "满溢之壶",
+        "circlet": "永劫之冕"
+      },
+      "pieces_en": {
+        "flower": "Bloom of the Mind's Desire",
+        "plume": "Feather of Indelible Sin",
+        "sands": "Revelation's Toll",
+        "goblet": "Vessel of Plenty",
+        "circlet": "Crown of the Befallen"
+      },
+      "release_index": 55
+    },
+    {
+      "good": "SilkenMoonsSerenade",
+      "mona": "SilkenMoonsSerenade",
+      "mingyu": "silken_moons_serenade",
+      "name_chs": "纺月的夜歌",
+      "name_en": "Silken Moon's Serenade",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "流离者的晶泪",
+        "plume": "受福者的白羽",
+        "sands": "祭霜者的迷狂",
+        "goblet": "至纯者的欢荣",
+        "circlet": "司信者的圣冕"
+      },
+      "pieces_en": {
+        "flower": "Crystal Tear of the Wanderer",
+        "plume": "Pristine Plume of the Blessed",
+        "sands": "Frost Devotee's Delirium",
+        "goblet": "Joyous Glory of the Pure",
+        "circlet": "Holy Crown of the Believer"
+      },
+      "release_index": 56
+    },
+    {
+      "good": "AubadeOfMorningstarAndMoon",
+      "mona": "AubadeOfMorningstarAndMoon",
+      "mingyu": "aubade_of_morningstar_and_moon",
+      "name_chs": "晨星与月的晓歌",
+      "name_en": "Aubade of Morningstar and Moon",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "献与月的华梦",
+        "plume": "献与月的离光",
+        "sands": "献与月的终时",
+        "goblet": "献与月的酹祭",
+        "circlet": "献与月的银冕"
+      },
+      "pieces_en": {
+        "flower": "Moonlit Offering's Opulent Dream",
+        "plume": "Moonlit Offering's Parting Light",
+        "sands": "Moonlit Offering's Final Hour",
+        "goblet": "Moonlit Offering's Libation",
+        "circlet": "Moonlit Offering's Silver Crown"
+      },
+      "release_index": 57
+    },
+    {
+      "good": "ADayCarvedFromRisingWinds",
+      "mona": "ADayCarvedFromRisingWinds",
+      "mingyu": "a_day_carved_from_rising_winds",
+      "name_chs": "风起之日",
+      "name_en": "A Day Carved From Rising Winds",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "风花的箴铭",
+        "plume": "晨光的明誓",
+        "sands": "春律的片刻",
+        "goblet": "未言的宴话",
+        "circlet": "哀慕的恋歌"
+      },
+      "pieces_en": {
+        "flower": "Windborne Flower's Spruchdichtung",
+        "plume": "Dawn's Brilliant Oath",
+        "sands": "A Note in Spring's Leich",
+        "goblet": "Heldenepos's Unspoken Tale",
+        "circlet": "Minnesang of Love and Lament"
+      },
+      "release_index": 58
+    },
+    {
+      "good": "CelestialGift",
+      "mona": "CelestialGift",
+      "mingyu": "celestial_gift",
+      "name_chs": "天之美赐",
+      "name_en": "Celestial Gift",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "天授之馨",
+        "plume": "天授之殁",
+        "sands": "天授之令",
+        "goblet": "天授之禄",
+        "circlet": "天授之冕"
+      },
+      "pieces_en": {
+        "flower": "Heavensent Fragrance",
+        "plume": "Heavensent Demise",
+        "sands": "Heavensent Decree",
+        "goblet": "Heavensent Reward",
+        "circlet": "Heavensent Crown"
+      },
+      "release_index": 59
+    },
+    {
+      "good": "DisenchantmentInDeepShadow",
+      "mona": "DisenchantmentInDeepShadow",
+      "mingyu": "disenchantment_in_deep_shadow",
+      "name_chs": "影中沉凝的幻灭",
+      "name_en": "Disenchantment in Deep Shadow",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "止于荣礼的缎彩",
+        "plume": "止于妙想成型的锋毫",
+        "sands": "止于宏伟梦醒的时刻",
+        "goblet": "止于祝庆的喝礼",
+        "circlet": "止于阔步跌坠的灵摆"
+      },
+      "pieces_en": {
+        "flower": "Iridescence That Ceased Amidst Glory",
+        "plume": "Sharpness That Ceased Upon Wondrous Creation",
+        "sands": "Moment That Ceased Upon Waking From Grand Dreams",
+        "goblet": "Ovations That Ceased Upon Festivity",
+        "circlet": "Pendulum That Ceased Amidst a Great Fall"
+      },
+      "release_index": 60
+    },
+    {
+      "good": "ScarletProof",
+      "mona": "ScarletProof",
+      "mingyu": "scarlet_proof",
+      "name_chs": "血红之证",
+      "name_en": "Scarlet Proof",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "感谢你的奉献",
+        "plume": "铭记你的功勋",
+        "sands": "授予你的年华",
+        "goblet": "饮尽你的血泪",
+        "circlet": "缅怀你的信仰"
+      },
+      "pieces_en": {
+        "flower": "Honor to Your Devotion",
+        "plume": "Glory to Your Legacy",
+        "sands": "Time Gifted Unto You",
+        "goblet": "Chalice of Your Blood and Sorrow",
+        "circlet": "Testament to Your Faith"
+      },
+      "release_index": 61
+    },
+    {
+      "good": "HeartOfTheFurnace",
+      "mona": "HeartOfTheFurnace",
+      "mingyu": "heart_of_the_furnace",
+      "name_chs": "炉火融炼之心",
+      "name_en": "Heart of the Furnace",
+      "rarities": [
+        4,
+        5
+      ],
+      "slots": [
+        "flower",
+        "plume",
+        "sands",
+        "goblet",
+        "circlet"
+      ],
+      "pieces_chs": {
+        "flower": "熔铸者的揣度",
+        "plume": "熔铸者的观测",
+        "sands": "熔铸者的计算",
+        "goblet": "熔铸者的雅量",
+        "circlet": "熔铸者的继志"
+      },
+      "pieces_en": {
+        "flower": "Foundryman's Conjecture",
+        "plume": "Foundryman's Observation",
+        "sands": "Foundryman's Calculus",
+        "goblet": "Foundryman's Magnanimity",
+        "circlet": "Foundryman's Legacy"
+      },
+      "release_index": 62
+    }
+  ],
+  "rarities": {
+    "ResolutionOfSojourner": [
+      3,
+      4
+    ],
+    "BraveHeart": [
+      3,
+      4
+    ],
+    "DefendersWill": [
+      3,
+      4
+    ],
+    "TinyMiracle": [
+      3,
+      4
+    ],
+    "Berserker": [
+      3,
+      4
+    ],
+    "MartialArtist": [
+      3,
+      4
+    ],
+    "Instructor": [
+      3,
+      4
+    ],
+    "Gambler": [
+      3,
+      4
+    ],
+    "TheExile": [
+      3,
+      4
+    ],
+    "Adventurer": [
+      1,
+      2,
+      3
+    ],
+    "LuckyDog": [
+      1,
+      2,
+      3
+    ],
+    "Scholar": [
+      3,
+      4
+    ],
+    "TravelingDoctor": [
+      1,
+      2,
+      3
+    ],
+    "BlizzardStrayer": [
+      4,
+      5
+    ],
+    "Thundersoother": [
+      4,
+      5
+    ],
+    "Lavawalker": [
+      4,
+      5
+    ],
+    "MaidenBeloved": [
+      4,
+      5
+    ],
+    "GladiatorsFinale": [
+      4,
+      5
+    ],
+    "ViridescentVenerer": [
+      4,
+      5
+    ],
+    "WanderersTroupe": [
+      4,
+      5
+    ],
+    "ThunderingFury": [
+      4,
+      5
+    ],
+    "CrimsonWitchOfFlames": [
+      4,
+      5
+    ],
+    "NoblesseOblige": [
+      4,
+      5
+    ],
+    "BloodstainedChivalry": [
+      4,
+      5
+    ],
+    "PrayersForIllumination": [
+      3,
+      4
+    ],
+    "PrayersForDestiny": [
+      3,
+      4
+    ],
+    "PrayersForWisdom": [
+      3,
+      4
+    ],
+    "PrayersToSpringtime": [
+      3,
+      4
+    ],
+    "ArchaicPetra": [
+      4,
+      5
+    ],
+    "RetracingBolide": [
+      4,
+      5
+    ],
+    "HeartOfDepth": [
+      4,
+      5
+    ],
+    "TenacityOfTheMillelith": [
+      4,
+      5
+    ],
+    "PaleFlame": [
+      4,
+      5
+    ],
+    "ShimenawasReminiscence": [
+      4,
+      5
+    ],
+    "EmblemOfSeveredFate": [
+      4,
+      5
+    ],
+    "HuskOfOpulentDreams": [
+      4,
+      5
+    ],
+    "OceanHuedClam": [
+      4,
+      5
+    ],
+    "VermillionHereafter": [
+      4,
+      5
+    ],
+    "EchoesOfAnOffering": [
+      4,
+      5
+    ],
+    "DeepwoodMemories": [
+      4,
+      5
+    ],
+    "GildedDreams": [
+      4,
+      5
+    ],
+    "DesertPavilionChronicle": [
+      4,
+      5
+    ],
+    "FlowerOfParadiseLost": [
+      4,
+      5
+    ],
+    "NymphsDream": [
+      4,
+      5
+    ],
+    "VourukashasGlow": [
+      4,
+      5
+    ],
+    "MarechausseeHunter": [
+      4,
+      5
+    ],
+    "GoldenTroupe": [
+      4,
+      5
+    ],
+    "SongOfDaysPast": [
+      4,
+      5
+    ],
+    "NighttimeWhispersInTheEchoingWoods": [
+      4,
+      5
+    ],
+    "FragmentOfHarmonicWhimsy": [
+      4,
+      5
+    ],
+    "UnfinishedReverie": [
+      4,
+      5
+    ],
+    "ScrollOfTheHeroOfCinderCity": [
+      4,
+      5
+    ],
+    "ObsidianCodex": [
+      4,
+      5
+    ],
+    "LongNightsOath": [
+      4,
+      5
+    ],
+    "FinaleOfTheDeepGalleries": [
+      4,
+      5
+    ],
+    "NightOfTheSkysUnveiling": [
+      4,
+      5
+    ],
+    "SilkenMoonsSerenade": [
+      4,
+      5
+    ],
+    "AubadeOfMorningstarAndMoon": [
+      4,
+      5
+    ],
+    "ADayCarvedFromRisingWinds": [
+      4,
+      5
+    ],
+    "CelestialGift": [
+      4,
+      5
+    ],
+    "DisenchantmentInDeepShadow": [
+      4,
+      5
+    ],
+    "ScarletProof": [
+      4,
+      5
+    ],
+    "HeartOfTheFurnace": [
+      4,
+      5
+    ]
+  },
+  "slots": {
+    "ResolutionOfSojourner": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "BraveHeart": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "DefendersWill": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "TinyMiracle": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "Berserker": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "MartialArtist": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "Instructor": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "Gambler": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "TheExile": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "Adventurer": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "LuckyDog": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "Scholar": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "TravelingDoctor": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "BlizzardStrayer": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "Thundersoother": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "Lavawalker": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "MaidenBeloved": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "GladiatorsFinale": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "ViridescentVenerer": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "WanderersTroupe": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "ThunderingFury": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "CrimsonWitchOfFlames": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "NoblesseOblige": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "BloodstainedChivalry": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "PrayersForIllumination": [
+      "circlet"
+    ],
+    "PrayersForDestiny": [
+      "circlet"
+    ],
+    "PrayersForWisdom": [
+      "circlet"
+    ],
+    "PrayersToSpringtime": [
+      "circlet"
+    ],
+    "ArchaicPetra": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "RetracingBolide": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "HeartOfDepth": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "TenacityOfTheMillelith": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "PaleFlame": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "ShimenawasReminiscence": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "EmblemOfSeveredFate": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "HuskOfOpulentDreams": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "OceanHuedClam": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "VermillionHereafter": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "EchoesOfAnOffering": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "DeepwoodMemories": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "GildedDreams": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "DesertPavilionChronicle": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "FlowerOfParadiseLost": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "NymphsDream": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "VourukashasGlow": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "MarechausseeHunter": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "GoldenTroupe": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "SongOfDaysPast": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "NighttimeWhispersInTheEchoingWoods": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "FragmentOfHarmonicWhimsy": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "UnfinishedReverie": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "ScrollOfTheHeroOfCinderCity": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "ObsidianCodex": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "LongNightsOath": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "FinaleOfTheDeepGalleries": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "NightOfTheSkysUnveiling": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "SilkenMoonsSerenade": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "AubadeOfMorningstarAndMoon": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "ADayCarvedFromRisingWinds": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "CelestialGift": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "DisenchantmentInDeepShadow": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "ScarletProof": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ],
+    "HeartOfTheFurnace": [
+      "flower",
+      "plume",
+      "sands",
+      "goblet",
+      "circlet"
+    ]
+  }
+}
