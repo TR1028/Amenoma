@@ -204,3 +204,57 @@ def test_draw_overlays():
     assert out.size == img.size and out.getpixel((int(g.first_x) + 1, int(g.first_y))) != (10, 10, 10)
     boxed = layout.draw_boxes(img, {'name': (10, 10, 100, 40)})
     assert boxed.getpixel((10, 20)) != (10, 10, 10)
+
+
+# ---------------------------------------------------------------- multi-aspect ratio yas parity
+YAS_RESOLUTIONS = [
+    (1600, 900, "16:9", 5, 8, 1090.0, 100.0, 700.0, 762.6),
+    (1440, 900, "16:10", 6, 8, 981.0, 90.0, 720.0, 776.0),
+    (1280, 960, "4:3", 7, 8, 872.0, 80.0, 800.0, 849.8),
+    (2100, 900, "21:9", 5, 11, 1531.0, 100.0, 700.0, 762.6),
+    (3440, 1440, "21:9", 5, 11, 2528.0, 160.0, 1119.0, 1220.0),
+]
+
+
+@pytest.mark.parametrize('w, h, aspect, expected_rows, expected_cols, panel_left, panel_top, panel_h, equip_top', YAS_RESOLUTIONS)
+def test_yas_multi_aspect_ratio_parity(w, h, aspect, expected_rows, expected_cols, panel_left, panel_top, panel_h, equip_top):
+    gi = legacy_game_info(w, h)
+    s = gi.scale_ratio
+
+    # 1. Panel dimensions and position
+    panel = layout.detail_panel_box(w, h)
+    assert panel[0] == pytest.approx(panel_left, abs=2.0)
+    assert panel[1] == pytest.approx(panel_top, abs=2.0)
+    assert (panel[3] - panel[1]) == pytest.approx(panel_h, abs=2.0)
+
+    # 2. Equipped rect anchoring across aspect ratios
+    # Equipped ref coords: [118, 1060, 520, 1100] relative to panel
+    ocr_boxes = layout.panel_ocr_boxes(panel[0], panel[1], s, panel_height=panel[3] - panel[1],
+                                       coords_dict={'equipped': [118, 1060, 520, 1100]})
+    equipped_client_top = ocr_boxes['equipped'][1]
+    assert equipped_client_top == pytest.approx(equip_top, abs=2.5)
+
+    # 3. Top bar buttons centered relative to w/2
+    assert gi.cdi_button[0] == pytest.approx(w / 2 - 255 * s)
+    assert gi.m_button[0] == pytest.approx(w / 2 - 10 * s)
+
+
+def test_material_scanner_offset_sync():
+    import material_scanner_logic
+    gi = legacy_game_info(1920, 1080)
+    msl = material_scanner_logic.MaterialScannerLogic(gi)
+
+    # Verify getItemCenter and getMaterialItemCoord apply the same offset_y
+    offset_y = 50.0
+    click_x, click_y = msl.getItemCenter(2, 3, offset_y=offset_y)
+    item_box = material_scanner_logic.getMaterialItemCoord(gi, 2, 3, offset_y=offset_y)
+
+    # Item box top should match the grid row_top shifted by offset_y
+    expected_top = gi.material_grid.row_top(2, offset_y=offset_y)
+    assert item_box[1] == pytest.approx(expected_top, abs=1.0)
+    assert click_y == pytest.approx(expected_top + gi.material_grid.card_height / 5, abs=1.0)
+
+    # Legacy lastrow=True matches passing grid.lastrow_offset
+    box_legacy = material_scanner_logic.getMaterialItemCoord(gi, 4, 0, lastrow=True)
+    box_explicit = material_scanner_logic.getMaterialItemCoord(gi, 4, 0, offset_y=gi.material_grid.lastrow_offset)
+    assert box_legacy == box_explicit

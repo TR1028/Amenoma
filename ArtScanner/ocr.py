@@ -91,13 +91,15 @@ class OCR:
                  crop is only included if the model can read the "（待激活）" marker.
         """
         s = self.scale_ratio
+        extra_h = max(0.0, float(art_img.height) - 1119.0 * s)
         crops = {
             'name': art_img.crop([i * s for i in Config.name_coords]),
             'type': art_img.crop([i * s for i in Config.type_coords]),
             'main_attr_name': art_img.crop([i * s for i in Config.main_attr_name_coords]),
             'main_attr_value': art_img.crop([i * s for i in Config.main_attr_value_coords]),
             'level': art_img.crop([i * s for i in Config.level_coords]),
-            'equipped': art_img.crop([i * s for i in Config.equipped_coords]),
+            'equipped': art_img.crop([Config.equipped_coords[0] * s, Config.equipped_coords[1] * s + extra_h,
+                                     Config.equipped_coords[2] * s, Config.equipped_coords[3] * s + extra_h]),
         }
         lines = [art_img.crop([i * s for i in coords]) for coords in (  # text colour [73, 83, 102]
             Config.subattr_1_coords, Config.subattr_2_coords, Config.subattr_3_coords, Config.subattr_4_coords)]

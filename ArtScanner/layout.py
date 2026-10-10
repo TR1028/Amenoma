@@ -253,12 +253,35 @@ def detect_row_offset(grid, column, y0, keypoint_is_label=None, tol=LABEL_TOLERA
 
 
 def detail_panel_box(width, height):
-    """Client box of the item detail panel on the right (same as ``GameInfo.art_info_*``)."""
+    """Client box of the item detail panel on the right (same as ``GameInfo.art_info_*``).
+
+    On aspect ratios taller than 16:9 (16:10, 4:3), the right panel stretches vertically to the
+    bottom of the window: ``extra_h = max(0, height - REF_HEIGHT * s)``.
+    """
     s = min(width / REF_WIDTH, height / REF_HEIGHT)
+    extra_h = max(0.0, float(height) - REF_HEIGHT * s)
     info_margin = 0 if width < 2 * height else 96 * s
     left = width - 816 * s - info_margin
     top = 160 * s
-    return left, top, left + 656 * s, top + 1119 * s
+    return left, top, left + 656 * s, top + 1119 * s + extra_h
+
+
+def panel_ocr_boxes(panel_left, panel_top, scale_ratio, panel_height=None, coords_dict=None):
+    """Calculate client pixel bounding boxes for panel OCR crops, anchoring bottom fields (equipped)."""
+    s = float(scale_ratio)
+    ref_panel_h = 1119.0 * s
+    extra_h = max(0.0, float(panel_height) - ref_panel_h) if panel_height is not None else 0.0
+    boxes = {}
+    if coords_dict:
+        for name, coords in coords_dict.items():
+            c = list(coords)
+            if name == 'equipped' and extra_h > 0:
+                boxes[name] = [panel_left + c[0] * s, panel_top + c[1] * s + extra_h,
+                               panel_left + c[2] * s, panel_top + c[3] * s + extra_h]
+            else:
+                boxes[name] = [panel_left + c[0] * s, panel_top + c[1] * s,
+                               panel_left + c[2] * s, panel_top + c[3] * s]
+    return boxes
 
 
 # ---------------------------------------------------------------------------------- debug drawing

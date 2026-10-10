@@ -26,8 +26,9 @@ class GameInfo:
         self.art_gap_x = 30.89 * self.scale_ratio
         self.art_gap_y = 30.35 * self.scale_ratio
 
+        extra_h = max(0.0, float(self.h) - 1440.0 * self.scale_ratio)
         self.art_info_width = 656 * self.scale_ratio
-        self.art_info_height = 1119 * self.scale_ratio
+        self.art_info_height = 1119 * self.scale_ratio + extra_h
 
         # == in <=2.4 ==
         # self.left_margin = (199.33 if self.w < 2 * self.h else 295.33) * self.scale_ratio
@@ -68,12 +69,12 @@ class GameInfo:
         # self.lastrow_offset = 34.5 * self.scale_ratio
         # == updated in 2.5 ==
         self.lastrow_offset = 125.5 * self.scale_ratio
-        # Character Development Item
-        self.cdi_button = (self.left + 1025 * self.scale_ratio,
+        # Character Development Item (tabs are centered at w/2 in the top bar)
+        self.cdi_button = (self.left + self.w / 2 - 255 * self.scale_ratio,
                            self.top + 70 * self.scale_ratio)
         # Materials
-        self.m_button = (self.left + 1270 * self.scale_ratio,
-                           self.top + 70 * self.scale_ratio)
+        self.m_button = (self.left + self.w / 2 - 10 * self.scale_ratio,
+                         self.top + 70 * self.scale_ratio)
 
         # The attributes above describe the material inventory (unchanged since 2.5, used by
         # MaterialScannerLogic).  Since 5.2 the artifact inventory has a filter bar above the grid, so

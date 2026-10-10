@@ -796,27 +796,12 @@ class Worker(QObject):
                 self.log(f"  - 失败: {self.failed_material}")
 
         def scan_materials(target):
-            start_row = 0
             self.log(f"开始扫描[{target}]")
             try:
-                while True:
-                    end_row = self.game_info.art_rows - 1
-                    if start_row != 0:
-                        end_row += 1
-                    if materialScanner.scanner.stopped:
-                        break
-                    if not materialScanner.scanRows(rows=range(start_row, end_row),
-                                                    callback=material_callback):
-                        break
-                    if start_row != 0:
-                        break
-                    start_row = (self.game_info.art_rows - 1 -
-                                 materialScanner.scrollToRow(
-                                     self.game_info.art_rows,
-                                     max_scrolls=20,
-                                     extra_scroll=int(self.game_info.art_rows > 5),
-                                     interval=self.detectSettings['delay']))
-                if materialScanner.scanner.stopped:
+                reason = materialScanner.scanMaterials(material_callback,
+                                                       interval=self.detectSettings['delay'],
+                                                       debug=debug_material_crop)
+                if materialScanner.scanner.stopped or reason == "stopped":
                     self.log(f'[{target}]扫描中断')
                 else:
                     self.log(f'[{target}]扫描已完成')
