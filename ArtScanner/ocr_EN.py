@@ -32,7 +32,7 @@ class Config_EN:
     subattr_2_coords = [67, 532, 560, 572]
     subattr_3_coords = [67, 584, 560, 624]
     subattr_4_coords = [67, 636, 560, 676]
-    equipped_coords = [105, 1060, 500, 1100]
+    equipped_coords = [105, 1060, 640, 1108]
     # 5.2+: lock button moved left, Astral Mark button at the old lock position (see ocr.Config).
     lock_coords = [450, 385, 575, 475]
     astral_mark_coords = [525, 385, 650, 475]
@@ -93,6 +93,8 @@ class OCR:
         """
         s = self.scale_ratio
         extra_h = max(0.0, float(art_img.height) - 1119.0 * s)
+        if extra_h < 2.0 * s:
+            extra_h = 0.0
         crops = {
             'name': art_img.crop([i * s for i in Config_EN.name_coords]),
             'type': art_img.crop([i * s for i in Config_EN.type_coords]),

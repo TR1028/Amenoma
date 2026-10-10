@@ -1,5 +1,6 @@
 import json
 import math
+import os
 
 import numpy as np
 import pytest
@@ -73,7 +74,7 @@ def test_artifact_rows_at_1080p():
     assert (g.rows, g.cols) == (4, 8)
     assert g.rows_float == pytest.approx(4.546, abs=0.01)
     legacy = layout.GridLayout.for_materials(1920, 1080)
-    assert (legacy.rows, legacy.cols) == (5, 8)
+    assert (legacy.rows, legacy.cols) == (4, 8)
 
 
 def test_overrides(tmp_path, monkeypatch):
@@ -258,3 +259,54 @@ def test_material_scanner_offset_sync():
     box_legacy = material_scanner_logic.getMaterialItemCoord(gi, 4, 0, lastrow=True)
     box_explicit = material_scanner_logic.getMaterialItemCoord(gi, 4, 0, offset_y=gi.material_grid.lastrow_offset)
     assert box_legacy == box_explicit
+
+
+@pytest.mark.parametrize('w, h, aspect, expected_rows, expected_cols, panel_left, panel_top, panel_h, equip_top', YAS_RESOLUTIONS)
+def test_every_scanned_card_within_viewport(w, h, aspect, expected_rows, expected_cols, panel_left, panel_top, panel_h, equip_top):
+    """Verify that every scanned card (and amount label) sits 100% inside the viewport at all resolutions."""
+    for kind in ('artifact', 'material'):
+        grid = layout.GridLayout(w, h, kind=kind)
+        s = grid.scale_ratio
+        for r in range(grid.rows):
+            for c in range(grid.cols):
+                box = grid.item_box(r, c, offset_y=0)
+                card_top, card_bottom = box[1], box[3]
+                assert card_top >= grid.first_y - 1.0, f"Card ({r}, {c}) top ({card_top}) above first_y ({grid.first_y})"
+                assert card_bottom <= grid.grid_bottom + 1.0, f"Card ({r}, {c}) bottom ({card_bottom}) below grid_bottom ({grid.grid_bottom})"
+                if kind == 'material':
+                    amt_bottom = card_top + 203.0 * s
+                    assert amt_bottom <= grid.grid_bottom + 1.0, f"Material amount label ({r}, {c}) cut off by grid_bottom"
+
+
+def test_verify_screenshot_cli(tmp_path):
+    from PIL import Image
+    from Tools import verify_screenshot
+
+    # 1. Detail panel mode
+    panel_img = Image.new('RGB', (656, 1119), (240, 235, 225))
+    panel_path = str(tmp_path / 'test_panel.png')
+    panel_img.save(panel_path)
+
+    res = verify_screenshot.analyze_screenshot(panel_path, out_dir=str(tmp_path), run_ocr=True)
+    assert res['is_detail_panel'] is True
+    assert 'boxes' in res
+    assert 'panel_features' in res
+    assert os.path.isfile(str(tmp_path / 'test_panel_overlay.png'))
+    assert os.path.isfile(str(tmp_path / 'test_panel_result.json'))
+    # OCR inference should succeed and populate ocr_raw with fields
+    assert 'ocr_raw' in res, f"Expected ocr_raw in result, got: {res.get('ocr_status')}"
+    assert 'name' in res['ocr_raw']
+    assert 'type' in res['ocr_raw']
+    assert 'level' in res['ocr_raw']
+
+    # 2. Full window screenshot mode (no-ocr mode)
+    win_img = Image.new('RGB', (1920, 1080), (30, 30, 35))
+    win_path = str(tmp_path / 'test_win.png')
+    win_img.save(win_path)
+
+    res_win = verify_screenshot.analyze_screenshot(win_path, kind='artifact', out_dir=str(tmp_path), run_ocr=False)
+    assert res_win['is_detail_panel'] is False
+    assert res_win['grid']['rows'] == 4
+    assert res_win['grid']['cols'] == 8
+    assert os.path.isfile(str(tmp_path / 'test_win_overlay.png'))
+    assert os.path.isfile(str(tmp_path / 'test_win_result.json'))

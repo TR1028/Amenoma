@@ -30,7 +30,7 @@ class Config:
     subattr_2_coords = [67, 532, 560, 572]
     subattr_3_coords = [67, 584, 560, 624]
     subattr_4_coords = [67, 636, 560, 676]
-    equipped_coords = [105, 1060, 500, 1100]
+    equipped_coords = [105, 1060, 640, 1108]
     # 5.2+: the lock button moved left (Inventory_Kamera: x 0.855 -> 0.75 of the panel width, centre
     # ~ x 506) and the new Astral Mark button sits at the old lock position ([570, 405, 620, 455]).
     # Both boxes are generous search regions for the coloured glyph of the active state
@@ -92,6 +92,8 @@ class OCR:
         """
         s = self.scale_ratio
         extra_h = max(0.0, float(art_img.height) - 1119.0 * s)
+        if extra_h < 2.0 * s:
+            extra_h = 0.0
         crops = {
             'name': art_img.crop([i * s for i in Config.name_coords]),
             'type': art_img.crop([i * s for i in Config.type_coords]),

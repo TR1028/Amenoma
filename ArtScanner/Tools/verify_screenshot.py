@@ -52,10 +52,35 @@ def _read_config_boxes(ocr_file: str) -> Dict[str, List[float]]:
     return boxes
 
 
+def find_model_path(kind: str, lang: str) -> Optional[str]:
+    """Locate the .h5 model file for the given kind and language with version fallback."""
+    lang = lang.upper()
+    kind = 'material' if kind == 'material' else 'artifact'
+    subdir = 'models_CHS' if lang == 'CHS' else 'models_EN'
+    models_dir = os.path.join(ARTSCANNER_DIR, 'rcc', subdir)
+
+    if lang == 'CHS':
+        if kind == 'artifact':
+            candidates = ['artifact_model_7.1.0.h5', 'artifact_model_3.4.0.h5']
+        else:
+            candidates = ['material_model_7.1.0.h5', 'material_model_3.4.0.h5']
+    else:
+        if kind == 'artifact':
+            candidates = ['artifact_model_EN_7.1.0.h5', 'artifact_model_EN_3.4.0.h5']
+        else:
+            candidates = ['material_model_EN_7.1.0.h5', 'material_model_EN_3.4.0.h5']
+
+    for name in candidates:
+        p = os.path.join(models_dir, name)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
 def is_detail_panel_only(width: int, height: int) -> bool:
     """Check if the image is an isolated detail panel crop rather than a full game window."""
     aspect = width / float(height)
-    # Detail panel reference aspect: 656 / 1119 ~ 0.586 (always tall, aspect < 0.8)
+    # Detail panel reference aspect: 656 / 1119 ~ 0.586 (always tall, aspect < 0.85)
     return aspect < 0.85 and width < 1200
 
 
@@ -89,6 +114,8 @@ def analyze_screenshot(img_path: str,
         # Direct detail panel analysis
         s = w / 656.0
         extra_h = max(0.0, float(h) - 1119.0 * s)
+        if extra_h < 2.0 * s:
+            extra_h = 0.0
         result["scale_ratio"] = round(s, 4)
         result["extra_height"] = round(extra_h, 2)
 
@@ -106,35 +133,45 @@ def analyze_screenshot(img_path: str,
         overlay_img.save(overlay_path)
 
         panel_info = {
-            "locked": panel_detect.detect_lock(img, raw_boxes.get('lock', [490, 480, 560, 560]), s),
-            "astral_mark": panel_detect.detect_astral_mark(img, raw_boxes.get('astral_mark', [490, 480, 560, 560]), s),
+            "locked": panel_detect.detect_lock(img, raw_boxes.get('lock', [450, 385, 575, 475]), s),
+            "astral_mark": panel_detect.detect_astral_mark(img, raw_boxes.get('astral_mark', [525, 385, 650, 475]), s),
         }
         result["panel_features"] = panel_info
         result["boxes"] = {k: [round(x, 1) for x in v] for k, v in panel_boxes.items()}
 
         if run_ocr:
-            try:
-                ocr_module = __import__('ocr' if lang == 'CHS' else 'ocr_EN')
-                model_cls = getattr(ocr_module, 'OCR')
-                model = model_cls()
-                model.setScaleRatio(s)
-                raw_data = model.detect_info(img)
-                corrected_data = dict(raw_data)
-                postprocess.correct_artifact(corrected_data, lang)
-                result["ocr_raw"] = raw_data
-                result["artifact"] = corrected_data
-            except Exception as e:
-                result["ocr_status"] = f"OCR skipped/failed: {e}"
+            model_path = find_model_path('artifact', lang)
+            if model_path is None:
+                result["ocr_status"] = f"No OCR model found for artifact, lang={lang}"
+            else:
+                try:
+                    ocr_module = __import__('ocr' if lang == 'CHS' else 'ocr_EN')
+                    model_cls = getattr(ocr_module, 'OCR')
+                    model = model_cls(model=model_path, scale_ratio=s)
+                    raw_data = model.detect_info(img)
+                    result["ocr_raw"] = raw_data
+                    try:
+                        corrected_data = dict(raw_data)
+                        warns = postprocess.correct_artifact(corrected_data, lang)
+                        result["artifact"] = corrected_data
+                        if warns:
+                            result["warnings"] = warns
+                    except Exception as pe:
+                        result["postprocess_status"] = f"Postprocessing failed: {pe}"
+                except Exception as e:
+                    result["ocr_status"] = f"OCR skipped/failed: {e}"
 
     else:
         # Full game window analysis
         s = min(w / float(layout.REF_WIDTH), h / float(layout.REF_HEIGHT))
         aspect_ratio = f"{w}:{h}"
         extra_h = max(0.0, float(h) - layout.REF_HEIGHT * s)
+        if extra_h < 2.0 * s:
+            extra_h = 0.0
 
         resolved_kind = kind
         if resolved_kind == 'auto':
-            # Default to artifact scanner unless material is explicitly detected
+            # Default to artifact scanner
             resolved_kind = 'artifact'
 
         overrides = layout.load_overrides(layout_file) if resolved_kind == 'artifact' else {}
@@ -208,24 +245,45 @@ def analyze_screenshot(img_path: str,
         # Crop detail panel for feature detection
         panel_img = img.crop(panel_box)
         panel_info = {
-            "locked": panel_detect.detect_lock(panel_img, raw_boxes.get('lock', [490, 480, 560, 560]), s),
-            "astral_mark": panel_detect.detect_astral_mark(panel_img, raw_boxes.get('astral_mark', [490, 480, 560, 560]), s),
+            "locked": panel_detect.detect_lock(panel_img, raw_boxes.get('lock', [450, 385, 575, 475]), s),
+            "astral_mark": panel_detect.detect_astral_mark(panel_img, raw_boxes.get('astral_mark', [525, 385, 650, 475]), s),
         }
         result["panel_features"] = panel_info
 
-        if run_ocr and resolved_kind == 'artifact':
-            try:
-                ocr_module = __import__('ocr' if lang == 'CHS' else 'ocr_EN')
-                model_cls = getattr(ocr_module, 'OCR')
-                model = model_cls()
-                model.setScaleRatio(s)
-                raw_data = model.detect_info(panel_img)
-                corrected_data = dict(raw_data)
-                postprocess.correct_artifact(corrected_data, lang)
-                result["ocr_raw"] = raw_data
-                result["artifact"] = corrected_data
-            except Exception as e:
-                result["ocr_status"] = f"OCR skipped/failed: {e}"
+        if run_ocr:
+            model_path = find_model_path(resolved_kind, lang)
+            if model_path is None:
+                result["ocr_status"] = f"No OCR model found for kind={resolved_kind}, lang={lang}"
+            else:
+                try:
+                    if resolved_kind == 'material':
+                        ocr_mod_name = 'ocr_m' if lang == 'CHS' else 'ocr_m_EN'
+                        ocr_module = __import__(ocr_mod_name)
+                        model_cls = getattr(ocr_module, 'OCR')
+                        model = model_cls(model=model_path)
+                        model.setScaleRatio(s)
+                        item_box = grid.item_box(visible_rows[0] if visible_rows else 0, 0, offset_y)
+                        item_img = img.crop(item_box)
+                        raw_data = model.detect_info(panel_img, item_img)
+                        result["ocr_raw"] = raw_data
+                        result["material"] = dict(raw_data)
+                    else:
+                        ocr_module = __import__('ocr' if lang == 'CHS' else 'ocr_EN')
+                        model_cls = getattr(ocr_module, 'OCR')
+                        model = model_cls(model=model_path)
+                        model.setScaleRatio(s)
+                        raw_data = model.detect_info(panel_img)
+                        result["ocr_raw"] = raw_data
+                        try:
+                            corrected_data = dict(raw_data)
+                            warns = postprocess.correct_artifact(corrected_data, lang)
+                            result["artifact"] = corrected_data
+                            if warns:
+                                result["warnings"] = warns
+                        except Exception as pe:
+                            result["postprocess_status"] = f"Postprocessing failed: {pe}"
+                except Exception as e:
+                    result["ocr_status"] = f"OCR skipped/failed: {e}"
 
     with open(result_path, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
@@ -295,6 +353,18 @@ def main(argv=None):
             print(f"Substats:    {', '.join(sub_list)}")
         if art.get('unactivated_substats'):
             print(f"Unactivated: {', '.join(art['unactivated_substats'])}")
+
+    if 'material' in res:
+        mat = res['material']
+        print("-" * 60)
+        print(f"Material:    {mat.get('name')}")
+        print(f"Amount:      {mat.get('amount')}")
+
+    if 'warnings' in res:
+        print("-" * 60)
+        print(f"Warnings:    {len(res['warnings'])} issue(s) detected and corrected:")
+        for w in res['warnings']:
+            print(f"  * {w}")
 
     print("=" * 60)
     return 0

@@ -57,13 +57,10 @@ class GameInfo:
         self.scroll_fin_keypt_x = self.left_margin + self.art_shift + 10 * self.scale_ratio
         self.scroll_fin_keypt_y = 335 * self.scale_ratio
 
-        self.art_rows = round((1270 * self.scale_ratio + self.h - 1440 * self.scale_ratio
+        self.art_rows = int(math.floor((1270 * self.scale_ratio + self.h - 1440 * self.scale_ratio
                                - self.first_art_y + self.art_gap_y) /
-                              (self.art_height + self.art_gap_y))
-        self.incomplete_lastrow = ((1270 * self.scale_ratio + self.h
-                                    - 1440 * self.scale_ratio
-                                    - self.first_art_y + self.art_gap_y) /
-                                   (self.art_height + self.art_gap_y) - self.art_rows + 1) < 0.7
+                              (self.art_height + self.art_gap_y) + 1e-6))
+        self.incomplete_lastrow = False
 
         # == in <=2.4 ==
         # self.lastrow_offset = 34.5 * self.scale_ratio

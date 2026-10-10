@@ -110,14 +110,9 @@ class GridLayout(object):
         self.grid_bottom = GRID_BOTTOM * s + height - REF_HEIGHT * s
         # number of (card + gap) units between the first row and the bottom of the grid
         self.rows_float = (self.grid_bottom - self.first_y + self.gap_y) / self.pitch_y
-        if kind == 'material':
-            # legacy rule: count a row that is at least 70% visible
-            self.rows = round(self.rows_float)
-            self.incomplete_lastrow = (self.rows_float - self.rows + 1) < 0.7
-        else:
-            # fully visible rows only (clicking a cut off card lets the game scroll the list)
-            self.rows = int(math.floor(self.rows_float + 1e-6))
-            self.incomplete_lastrow = False
+        # fully visible rows only (clicking a cut-off card auto-scrolls the game and cuts off amount labels)
+        self.rows = int(math.floor(self.rows_float + 1e-6))
+        self.incomplete_lastrow = False
         if rows:
             self.rows = int(rows)
 
