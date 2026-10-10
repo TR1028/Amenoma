@@ -539,8 +539,7 @@ class Worker(QObject):
             self.bundle_dir = sys.argv[1]
         else:
             self.bundle_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
-        self.model = ocr_EN.OCR(model=os.path.join(self.bundle_dir,
-                                                   f'rcc/models_EN/artifact_model_EN_{config.MODEL_VERSION}.h5'))
+        self.model = ocr_EN.OCR(model=config.model_path(self.bundle_dir, 'EN', 'artifact'))
 
         self.log('Initialize is finished.')
         if self.isWindowCaptured:
@@ -571,8 +570,7 @@ class Worker(QObject):
             self.bundle_dir = sys.argv[1]
         else:
             self.bundle_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
-        self.model_m = ocr_m_EN.OCR(model=os.path.join(self.bundle_dir,
-                                                       f'rcc/models_EN/material_model_EN_{config.MODEL_VERSION}.h5'))
+        self.model_m = ocr_m_EN.OCR(model=config.model_path(self.bundle_dir, 'EN', 'material'))
 
         self.log('Initializing finished')
         if self.isWindowCaptured:

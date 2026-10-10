@@ -360,9 +360,19 @@ def preflight(spec, charset, width, height, max_length, fonts, force=False):
 
 
 def data_config(spec, charset, width, height, max_length, args):
+    p_focus = float(getattr(args, 'focus', 0.0) or 0.0)
+    known = None
+    if p_focus > 0:
+        path = getattr(args, 'focus_charset', None) or os.path.join(
+            tc.SHIPPED_MODEL_DIRS[spec['lang']], tc.charset_filename(spec['lang'], spec['kind']))
+        data = tc.load_charset_json(path)
+        known = list(data['charset'] if isinstance(data, dict) else data)
+        log('focus {}: strings with characters outside {} ({} chars), extra lines {}'.format(
+            p_focus, path, len(known), getattr(args, 'extra_lines', 0)))
     return dict(lang=spec['lang'], kind=spec['kind'], charset=list(charset), max_length=max_length,
                 width=width, height=height, font=args.font, fallback_fonts=args.fallback_font,
-                samples_per_step=args.samples_per_step, p_unactivated=args.p_unactivated)
+                samples_per_step=args.samples_per_step, p_unactivated=args.p_unactivated,
+                p_focus=p_focus, known_chars=known, extra_lines=int(getattr(args, 'extra_lines', 0) or 0))
 
 
 def charset_meta(spec, args, model_file=None, version=None, extra=None):
@@ -843,6 +853,13 @@ def parse_args(spec, argv=None):
                    help='fixed synthetic validation lines (0: off; default 1024, 64 for smoke)')
     t.add_argument('--p-unactivated', type=float, default=0.35,
                    help='probability that an artifact sample has a grey 6.0 "unactivated" substat')
+    t.add_argument('--focus', type=float, default=0.0,
+                   help='training data only: probability of drawing artifact names / characters / material '
+                        'names from the strings with characters outside --focus-charset')
+    t.add_argument('--focus-charset', metavar='JSON', default=None,
+                   help='vocabulary treated as known by --focus (default: pinned charset of the shipped model)')
+    t.add_argument('--extra-lines', type=int, default=0,
+                   help='training data only: extra name + equipped lines per artifact panel')
     t.add_argument('--seed', type=int, default=None)
     t.add_argument('--force', action='store_true', help='train even if labels do not fit the geometry')
     o = p.add_argument_group('model / files')

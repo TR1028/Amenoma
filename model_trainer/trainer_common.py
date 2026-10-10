@@ -639,6 +639,14 @@ def material_charset_strings(lang, names=None):
 
 
 # --------------------------------------------------------------------------- samplers
+def focus_pools(tables, keys, known_chars):
+    """``{key: strings of tables[key] containing a character outside known_chars}`` (``{}`` without them)."""
+    if not known_chars:
+        return {}
+    known = set(known_chars)
+    return {k: [s for s in tables[k] if any(c not in known for c in s)] for k in keys}
+
+
 class ArtifactSampler(object):
     """One sample = one artifact detail panel (6 fixed fields + 1..4 substats).
 
@@ -647,7 +655,8 @@ class ArtifactSampler(object):
     unactivated marker and is drawn in grey.
     """
 
-    def __init__(self, lang, seed=None, font=None, fallback_fonts=None, p_unactivated=0.35):
+    def __init__(self, lang, seed=None, font=None, fallback_fonts=None, p_unactivated=0.35, p_focus=0.0,
+                 known_chars=None, extra_lines=0):
         self.lang = lang
         self.style = lang
         self.rng = np.random.RandomState(seed)
@@ -655,6 +664,19 @@ class ArtifactSampler(object):
         self.fonts = FontBank(font, fallback_fonts)
         self.p_unactivated = float(p_unactivated)
         self.min_canvas = (550, 55) if lang == 'chs' else (770, 60)
+        # Optional training emphasis (--focus / --extra-lines): names and characters containing a
+        # character outside ``known_chars`` are drawn with probability ``p_focus``, and every panel gets
+        # ``extra_lines`` more name + equipped lines.  The defaults keep the historical distribution and
+        # RNG stream; validation sets never use it.
+        self.p_focus = float(p_focus)
+        self.focus = focus_pools(self.tables, ('names', 'users'), known_chars) if self.p_focus > 0 else {}
+        self.extra_lines = int(extra_lines)
+
+    def _pick(self, key):
+        pool = self.focus.get(key)
+        if pool and self.rng.rand() < self.p_focus:
+            return self._choice(pool)
+        return self._choice(self.tables[key])
 
     def _choice(self, seq):
         return seq[self.rng.randint(len(seq))]
@@ -673,7 +695,7 @@ class ArtifactSampler(object):
         return t['sub_names'][prop] + '+' + t['formats'][prop].format(value)
 
     def gen_equipped(self):
-        user = self._choice(self.tables['users'])
+        user = self._pick('users')
         return user + u'已装备' if self.lang == 'chs' else 'Equipped: ' + user
 
     def _unactivated_style(self):
@@ -683,7 +705,7 @@ class ArtifactSampler(object):
     def texts(self):
         t = self.tables
         fields = collections.OrderedDict()
-        fields['name'] = self._choice(t['names'])
+        fields['name'] = self._pick('names')
         fields['type'] = self._choice(t['types'])
         fields['main_attr_name'] = self._choice(list(t['main_names'].values()))
         fields['main_attr_value'] = self.gen_main_attr_value()
@@ -692,6 +714,9 @@ class ArtifactSampler(object):
         n_sub = self.rng.randint(1, 5)
         for i in range(n_sub):
             fields['subattr_{}'.format(i + 1)] = self.gen_single_sub_attr()
+        for i in range(self.extra_lines):
+            fields['name_x{}'.format(i + 1)] = self._pick('names')
+            fields['equipped_x{}'.format(i + 1)] = self.gen_equipped()
         unactivated = None
         if self.rng.rand() < self.p_unactivated:
             key = 'subattr_{}'.format(n_sub)
@@ -728,7 +753,7 @@ class ArtifactSampler(object):
                 labels.append(lbl)
                 keys.append(key + '+unactivated')
             else:
-                two_lines = self.lang == 'en' and key == 'name' and (
+                two_lines = self.lang == 'en' and key.startswith('name') and (
                         len(text) >= 35 or (len(text) >= 30 and self.rng.rand() < 0.3))
                 images.append(render_text_image(self.fonts, text, self.rng, min_canvas=self.min_canvas,
                                                 two_lines=two_lines))
@@ -740,18 +765,25 @@ class ArtifactSampler(object):
 class MaterialSampler(object):
     """One sample = 8 (name, amount) pairs, as in train_model_materials(_EN).py."""
 
-    def __init__(self, lang, seed=None, font=None, fallback_fonts=None, pairs=8):
+    def __init__(self, lang, seed=None, font=None, fallback_fonts=None, pairs=8, p_focus=0.0,
+                 known_chars=None):
         self.lang = lang
         self.style = lang
         self.rng = np.random.RandomState(seed)
         self.names = load_material_names(lang)
         self.fonts = FontBank(font, fallback_fonts)
         self.pairs = int(pairs)
+        self.p_focus = float(p_focus)  # see ArtifactSampler
+        self.focus_names = (focus_pools({'names': self.names}, ('names',), known_chars).get('names')
+                            if self.p_focus > 0 else None)
 
     def texts(self):
         out = []
         for _ in range(self.pairs):
-            out.append(self.names[self.rng.randint(len(self.names))])
+            if self.focus_names and self.rng.rand() < self.p_focus:
+                out.append(self.focus_names[self.rng.randint(len(self.focus_names))])
+            else:
+                out.append(self.names[self.rng.randint(len(self.names))])
             out.append(str(self.rng.randint(0, 9999)))
         return out
 
@@ -769,9 +801,11 @@ SAMPLERS = {'art': ArtifactSampler, 'mat': MaterialSampler}
 
 def make_sampler(cfg, seed):
     cls = SAMPLERS[cfg['kind']]
-    kwargs = dict(seed=seed, font=cfg.get('font'), fallback_fonts=cfg.get('fallback_fonts'))
+    kwargs = dict(seed=seed, font=cfg.get('font'), fallback_fonts=cfg.get('fallback_fonts'),
+                  p_focus=cfg.get('p_focus', 0.0), known_chars=cfg.get('known_chars'))
     if cfg['kind'] == 'art':
         kwargs['p_unactivated'] = cfg.get('p_unactivated', 0.35)
+        kwargs['extra_lines'] = cfg.get('extra_lines', 0)
     return cls(cfg['lang'], **kwargs)
 
 
@@ -887,6 +921,7 @@ class BatchStream(object):
 
 def validation_set(cfg, n_lines, seed=12345, skip_unknown=False):
     """Fixed synthetic validation lines: ``(x, labels, keys)``."""
+    cfg = dict(cfg, p_focus=0.0, extra_lines=0)  # always the plain data distribution
     sampler = make_sampler(cfg, seed)
     codec = LabelCodec(cfg['charset'], cfg['max_length'])
     xs, labels, keys = [], [], []

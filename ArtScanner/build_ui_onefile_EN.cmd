@@ -1,4 +1,5 @@
-rem MODEL_VERSION / DATA_VERSION must match config.py
+rem DATA_VERSION must match config.py.  The EN models are not retrained for 7.1 yet: bundle the
+rem 3.4.0 weights (config.FALLBACK_MODEL_VERSIONS, picked by config.model_path).
 set MODEL_VERSION=3.4.0
 set DATA_VERSION=v71
 

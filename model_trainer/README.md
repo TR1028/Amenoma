@@ -166,7 +166,8 @@ The same options apply to the other three scripts (`--help`).
    ArtScanner finds `<model>.charset.json` first, and it takes the input width
    from the model.
 2. Set `MODEL_VERSION = "<ver>"` in `ArtScanner/config.py`. This loads
-   `rcc/models_*/<model>_<MODEL_VERSION>.h5` for **all four** models.
+   `rcc/models_*/<model>_<MODEL_VERSION>.h5` for each model, falling back per file to `FALLBACK_MODEL_VERSIONS`
+   (3.4.0) when it is absent; see `config.model_path` (the EN models are still 3.4.0).
    - If only some models were retrained, re-export the others under the new
      version name with their old vocabulary. For example:
      ```
@@ -223,3 +224,26 @@ Measured on this machine: 24 vCPU Xeon (AVX2), no GPU, `--workers 4`, steady-sta
     architecture. Use `converters/model_converter.py` instead.
   - `mobilenetv3.py`: still used, as is.
   - `dev_env.yml`: the original Windows GPU conda environment.
+
+## 7.1.0 CHS retrain (focused fine-tuning)
+
+`--focus P` draws artifact names / characters / material names with probability P from the strings that
+contain a character outside `--focus-charset` (default: the pinned charset of the shipped model, i.e. the
+3.4 vocabulary); `--extra-lines N` adds N name + equipped lines to every artifact panel.  Both only change
+the training stream: validation sets and `--evaluate` always use the plain distribution, and the defaults
+(0) keep the historical data / RNG stream.  Recipe used for the CHS 7.1.0 models (venv: Python 3.8 +
+TF 2.3, run from `model_trainer/`):
+
+    # artifact: warm start from 3.4.0 ...
+    python train_model_artifact.py --warm-start --steps-per-epoch 200 --epochs 25 --lr 5e-4 --lr-patience 4 \
+        --stop-at 0.992 --stop-patience 2 --samples-per-step 4 --workers 4 --val-lines 512 --seed 42 \
+        --train-dir train/art_71 --out-dir output/art_71
+    # ... then a focused continuation (kept only if its best val_ctc_accu beats the first run)
+    python train_model_artifact.py --init-from output/art_71/weights/artifact_model_7.1.0.weights.npz \
+        --init-charset train/art_71/charset_chs_art.json --focus 0.6 --extra-lines 2 --steps-per-epoch 200 \
+        --epochs 30 --lr 2.5e-4 --lr-patience 3 --stop-at 0.992 --stop-patience 2 --samples-per-step 4 \
+        --workers 4 --val-lines 512 --seed 42 --train-dir train/art_71b --out-dir output/art_71b
+    # material: warm start from 3.4.0 with focus
+    python train_model_materials.py --warm-start --focus 0.5 --steps-per-epoch 200 --epochs 40 --lr 5e-4 \
+        --lr-patience 4 --stop-at 0.992 --stop-patience 2 --samples-per-step 4 --workers 4 --val-lines 512 \
+        --seed 42 --train-dir train/mat_71 --out-dir output/mat_71

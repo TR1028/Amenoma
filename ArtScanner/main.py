@@ -98,7 +98,7 @@ game_info.calculateCoordinates()
 # margin near level number, color=233,229,220
 
 # initialization
-ocr_model = ocr.OCR(model=os.path.join(bundle_dir, f'rcc/models_CHS/artifact_model_{config.MODEL_VERSION}.h5'),
+ocr_model = ocr.OCR(model=config.model_path(bundle_dir, 'CHS', 'artifact'),
                     scale_ratio=game_info.scale_ratio)
 art_id = 0
 saved = 0

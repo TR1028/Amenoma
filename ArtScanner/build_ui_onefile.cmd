@@ -1,5 +1,5 @@
 rem MODEL_VERSION / DATA_VERSION must match config.py
-set MODEL_VERSION=3.4.0
+set MODEL_VERSION=7.1.0
 set DATA_VERSION=v71
 
 pyinstaller -w -F ^
