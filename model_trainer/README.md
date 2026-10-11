@@ -238,10 +238,10 @@ TF 2.3, run from `model_trainer/`):
     python train_model_artifact.py --warm-start --steps-per-epoch 200 --epochs 25 --lr 5e-4 --lr-patience 4 \
         --stop-at 0.992 --stop-patience 2 --samples-per-step 4 --workers 4 --val-lines 512 --seed 42 \
         --train-dir train/art_71 --out-dir output/art_71
-    # ... then a focused continuation (kept only if its best val_ctc_accu beats the first run)
+    # ... then a focused continuation (kept only if it beats the first run on the standard --evaluate)
     python train_model_artifact.py --init-from output/art_71/weights/artifact_model_7.1.0.weights.npz \
-        --init-charset train/art_71/charset_chs_art.json --focus 0.6 --extra-lines 2 --steps-per-epoch 200 \
-        --epochs 30 --lr 2.5e-4 --lr-patience 3 --stop-at 0.992 --stop-patience 2 --samples-per-step 4 \
+        --init-charset train/art_71/charset_chs_art.json --focus 0.6 --extra-lines 2 --p-unactivated 0.7 --steps-per-epoch 200 \
+        --epochs 25 --lr 2.5e-4 --lr-patience 3 --stop-at 0.992 --stop-patience 2 --samples-per-step 4 \
         --workers 4 --val-lines 512 --seed 42 --train-dir train/art_71b --out-dir output/art_71b
     # material: warm start from 3.4.0 with focus
     python train_model_materials.py --warm-start --focus 0.5 --steps-per-epoch 200 --epochs 40 --lr 5e-4 \
