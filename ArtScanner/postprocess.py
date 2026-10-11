@@ -394,7 +394,25 @@ def correct_artifact(info, lang='CHS'):
     if tm.value is None:
         warnings.append('type %r not recognised, %r is a %s' % (raw_type, m.value, t.types[slot]))
     elif t.types.index(tm.value) != slot:
-        warnings.append('type %r does not match %r (a %s), trusting the name' % (raw_type, m.value, t.types[slot]))
+        slot_guess = t.types.index(tm.value)
+        same_slot = fuzzy_match(raw_name, [p for p, (sid, s) in t.piece_index.items() if sid == setid and s == slot_guess])
+        raw_main = info.get('main_attr_name', '')
+        key_slot, _ = resolve_main_stat(raw_main, slot, lang)
+        key_guess, _ = resolve_main_stat(raw_main, slot_guess, lang)
+        try:
+            star_chk = int(info.get('star'))
+        except (TypeError, ValueError):
+            star_chk = 5
+        val_slot = main_value_levels(key_slot, star_chk, try_decode_value(info.get('main_attr_value'), is_percent_key(key_slot))) if key_slot else []
+        val_guess = main_value_levels(key_guess, star_chk, try_decode_value(info.get('main_attr_value'), is_percent_key(key_guess))) if key_guess else []
+        if same_slot.value is not None and key_guess is not None and (key_slot is None or (val_guess and not val_slot)):
+            warnings.append('name %r -> %r (same-set %s confirmed by type and main stat)'
+                            % (raw_name, same_slot.value, tm.value))
+            m = same_slot
+            info['name'] = m.value
+            slot = slot_guess
+        else:
+            warnings.append('type %r does not match %r (a %s), trusting the name' % (raw_type, m.value, t.types[slot]))
     info['slot'] = slot
     info['type'] = t.types[slot]
 

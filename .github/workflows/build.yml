@@ -1,0 +1,75 @@
+name: Build & Test (Windows EXE)
+
+on:
+  push:
+    branches:
+      - main
+      - update-7x
+      - ocr-fix
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Test & Build Windows EXE (Python 3.8)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.8.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8.10'
+          architecture: 'x64'
+          cache: 'pip'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade "pip<25.1" "setuptools<76" wheel
+          python -m pip install -r requirements.txt
+          python -m pip install protobuf==3.20.3 pytest "pyinstaller==5.13.2"
+          python -c "import tensorflow as tf, PyQt5, Levenshtein, ZODB; print('TF:', tf.__version__)"
+
+      - name: Run unit & integration test suite
+        shell: pwsh
+        run: |
+          python -m pytest -q
+
+      - name: Build Amenoma directory package (CHS 7.1.0)
+        shell: cmd
+        working-directory: ArtScanner
+        run: |
+          call build_ui_dir.cmd
+
+      - name: Archive directory build
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "ArtScanner/dist/Amenoma/*" -DestinationPath "Amenoma-CHS-v7.1.0-win64-dir.zip" -Force
+
+      - name: Build Amenoma single-file executable (CHS 7.1.0)
+        shell: cmd
+        working-directory: ArtScanner
+        run: |
+          rmdir /s /q build dist
+          call build_ui_onefile.cmd
+
+      - name: Upload Amenoma directory build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Amenoma-CHS-v7.1.0-win64-dir
+          path: Amenoma-CHS-v7.1.0-win64-dir.zip
+          retention-days: 90
+
+      - name: Upload Amenoma single-file EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Amenoma-CHS-v7.1.0-win64-onefile
+          path: ArtScanner/dist/Amenoma.exe
+          retention-days: 90

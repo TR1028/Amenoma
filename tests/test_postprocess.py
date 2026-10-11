@@ -236,6 +236,16 @@ def test_correct_artifact_type_mismatch_trusts_name():
     assert any('trusting the name' in w for w in warnings)
 
 
+def test_correct_artifact_same_set_sibling_resolved_by_type_and_main_stat():
+    # '天授之禄' (sands, slot 2) is 1 edit from '天授之馨' (flower, slot 0) of the same set;
+    # when type is '生之花' and main stat is flat HP 4,780, resolve to '天授之馨'.
+    info = chs_info(name='天授之禄', type='生之花', main_attr_name='生命值', main_attr_value='4,780')
+    warnings = postprocess.correct_artifact(info, 'CHS')
+    assert info['name'] == '天授之馨' and info['type'] == '生之花' and info['slot'] == 0
+    assert any('confirmed by type and main stat' in w for w in warnings)
+
+
+
 @pytest.mark.parametrize('star', [0, 6, None, 3])
 def test_correct_artifact_bad_rarity(star):
     # Heart of Depth only exists as 4 and 5 star
