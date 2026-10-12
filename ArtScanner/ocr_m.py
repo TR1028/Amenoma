@@ -48,7 +48,7 @@ class OCR:
         x = np.concatenate([
             self.preprocess(info[key]).T[None, :, :, None]
             for key in sorted(info.keys())], axis=0)
-        y = self.model.predict(x)
+        y = self.model.predict(x, verbose=0)
         y = self.decode(y)
         return {**{key: v for key, v in zip(sorted(info.keys()), y)},
                 **{'star': self.detect_star(detail_img)}}
@@ -61,7 +61,7 @@ class OCR:
     def detect_star(self, material_img):
         star = material_img.crop([i * self.scale_ratio for i in Config.star_coords])
         cropped_star = self.crop(self.normalize(self.to_gray(star), auto_inverse=False))
-        coef = cropped_star.shape[1] / cropped_star.shape[0]
+        coef = cropped_star.shape[1] / max(1, cropped_star.shape[0])
         coef = coef / 1.30882352 + 0.21568627
         return round(coef)
 
@@ -73,7 +73,9 @@ class OCR:
 
     def normalize(self, img, auto_inverse=True):
         img -= img.min()
-        img /= img.max()
+        denom = img.max()
+        if denom > 0:
+            img /= denom
         if auto_inverse and img[-1, -1] > 0.5:
             img = 1 - img
         return img
@@ -94,10 +96,12 @@ class OCR:
 
     def resize_to_height(self, img):
         height = self.height
+        h0 = max(1, img.shape[0])
+        w_out = max(1, int(img.shape[1] * height / h0))
         return (
                 np.array(
                     Image.fromarray(np.uint8(img * 255)).resize(
-                        (int(img.shape[1] * height / img.shape[0]), height),
+                        (w_out, height),
                         Image.BILINEAR,
                     )
                 )

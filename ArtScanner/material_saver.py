@@ -55,8 +55,11 @@ class MaterialDatabase:
         }
         for index in range(int(self.root['size'])):
             material = self.root[str(index)]
-            result['materials'][MaterialInfo.MaterialsNameCHS[material.name]] = material.amount
-        f = open(path, "wb")
-        s = json.dumps(result, ensure_ascii=False)
-        f.write(s.encode('utf-8'))
-        f.close()
+            key = MaterialInfo.MaterialsNameCHS.get(material.name)
+            if key is not None:
+                result['materials'][key] = material.amount
+            else:
+                utils.logger.warning(f"[MaterialDB] Unknown material name when exporting: {material.name}")
+        with open(path, "wb") as f:
+            s = json.dumps(result, ensure_ascii=False)
+            f.write(s.encode('utf-8'))

@@ -1,3 +1,4 @@
+import sys
 import keyboard
 import unicodedata
 import win32api
@@ -10,6 +11,49 @@ import Levenshtein
 import ArtsInfo
 import logging
 import MaterialInfo
+
+
+class _NullStream:
+    encoding = "utf-8"
+    closed = False
+
+    def write(self, s):
+        return len(s) if s is not None else 0
+
+    def writelines(self, lines):
+        pass
+
+    def flush(self):
+        pass
+
+    def isatty(self):
+        return False
+
+    def close(self):
+        pass
+
+
+def ensure_standard_streams():
+    if sys.stdout is None:
+        sys.stdout = _NullStream()
+    if sys.stderr is None:
+        sys.stderr = _NullStream()
+    if getattr(sys, "__stdout__", None) is None:
+        sys.__stdout__ = sys.stdout
+    if getattr(sys, "__stderr__", None) is None:
+        sys.__stderr__ = sys.stderr
+
+    loggers = [logging.getLogger()]
+    for lg in list(logging.Logger.manager.loggerDict.values()):
+        if isinstance(lg, logging.Logger):
+            loggers.append(lg)
+    for lg in loggers:
+        for handler in getattr(lg, "handlers", ()):
+            if isinstance(handler, logging.StreamHandler) and getattr(handler, "stream", None) is None:
+                handler.stream = sys.stderr
+
+
+ensure_standard_streams()
 
 logger = logging.getLogger()
 logHandler = logging.FileHandler("./Amenoma.log", encoding='utf-8')
@@ -71,13 +115,28 @@ def captureWindow(hwnd, local_rect=None):
         [screen_rect[1], screen_rect[0], screen_rect[2] - screen_rect[0], screen_rect[3] - screen_rect[1]])
 
 
+_DIGIT_TRANS = str.maketrans({
+    'O': '0', 'o': '0', 'D': '0',
+    'l': '1', 'I': '1', 'i': '1', '|': '1',
+    'Z': '2', 'z': '2',
+    'S': '5', 's': '5',
+    'B': '8',
+})
+
+
 def decodeValue(v):
     if type(v) != str:
         return v
-    if "%" in v:
-        return float(v[:-1]) / 100
+    s = v.strip().translate(_DIGIT_TRANS)
+    if "%" in s:
+        return float(s.replace('%', '').replace(',', '').replace('+', '').strip()) / 100
     else:
-        return int(v.replace(',', '').replace('+', ''))
+        cleaned = s.replace(',', '').replace('+', '').strip()
+        if not cleaned.lstrip('-').isdigit():
+            digits = ''.join(ch for ch in cleaned if ch.isdigit())
+            if digits:
+                cleaned = ('-' if cleaned.startswith('-') else '') + digits
+        return int(cleaned)
 
 
 def attr_auto_correct(attr: str) -> str:
@@ -243,16 +302,17 @@ def equipped_auto_correct_EN(name: str) -> str:
 def material_name_auto_correct(name: str) -> str:
     corr_name = ""
     dis = 10000000
-    if name in MaterialInfo.MaterialsNameCHS:
-        return name
+    norm_name = name.replace("原坯", "原胚")
+    if norm_name in MaterialInfo.MaterialsNameCHS:
+        return norm_name
     for item in MaterialInfo.MaterialsNameCHS:
-        ndis = Levenshtein.distance(name, item)
+        ndis = Levenshtein.distance(norm_name, item)
         if ndis < dis:
             corr_name = item
             dis = ndis
     if dis == 0:
         pass
-    elif dis <= (len(name) // 3):
+    elif dis <= (len(norm_name) // 3):
         logger.info(f"Corrected material name from [{name}] to [{corr_name}] with distance {dis}")
     else:
         logger.warning(f"Corrected material  name from [{name}] to [{corr_name}] with distance {dis}")

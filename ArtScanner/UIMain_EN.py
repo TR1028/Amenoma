@@ -13,12 +13,14 @@ from PyQt5.QtGui import (QMovie, QPixmap)
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QDialog,
                              QWidget, QCheckBox, QHBoxLayout, QMessageBox)
 
+import utils
+utils.ensure_standard_streams()
+
 import ArtsInfo
 import artifact_debug
 import ocr_EN
 import ocr_m_EN
 import postprocess
-import utils
 import config
 import ToolboxMain_EN
 
@@ -639,6 +641,7 @@ class Worker(QObject):
 
     @pyqtSlot(dict)
     def scanMaterials(self, info: dict):
+        utils.ensure_standard_streams()
         self.working.emit()
         if not self.isWindowCaptured:
             self.error('The window is not captured, please recapture the window')
@@ -646,6 +649,7 @@ class Worker(QObject):
             self.endWorking.emit()
             return
 
+        os.makedirs('materials', exist_ok=True)
         self.model_m.setScaleRatio(self.game_info.scale_ratio)
         self.detectSettings = info
         materialsDB = MaterialDatabase()
@@ -665,11 +669,6 @@ class Worker(QObject):
         time.sleep(1)
         self.log('1...')
         time.sleep(1)
-
-        self.log('Aligning...')
-        materialScanner.alignFirstRow()
-        self.log('Completed, starting now')
-        time.sleep(0.5)
 
         self.material_id = 0
         self.saved_material = 0
@@ -768,27 +767,30 @@ class Worker(QObject):
             saveImg(detected_info, detail_img, item_img, status)
 
         def saveImg(detected_info, detail_img, item_img, status):
-            if self.detectSettings['ExtraSettings']['ExportAllImages']:
-                if status == 3:
-                    detail_img.save(f'materials/fail_{self.material_id}.png')
-                    item_img.save(f'materials/item_fail_{self.material_id}.png')
-                    s = json.dumps(detected_info, ensure_ascii=False)
-                    with open(f"materials/fail_{self.material_id}.json", "wb") as f:
-                        f.write(s.encode('utf-8'))
+            try:
+                if self.detectSettings['ExtraSettings']['ExportAllImages']:
+                    if status == 3:
+                        detail_img.save(f'materials/fail_{self.material_id}.png')
+                        item_img.save(f'materials/item_fail_{self.material_id}.png')
+                        s = json.dumps(detected_info, ensure_ascii=False)
+                        with open(f"materials/fail_{self.material_id}.json", "wb") as f:
+                            f.write(s.encode('utf-8'))
+                    else:
+                        detail_img.save(f'materials/{self.material_id}.png')
+                        item_img.save(f'materials/item_{self.material_id}.png')
+                        s = json.dumps(detected_info, ensure_ascii=False)
+                        with open(f"materials/{self.material_id}.json", "wb") as f:
+                            f.write(s.encode('utf-8'))
                 else:
-                    detail_img.save(f'materials/{self.material_id}.png')
-                    item_img.save(f'materials/item_{self.material_id}.png')
-                    s = json.dumps(detected_info, ensure_ascii=False)
-                    with open(f"materials/{self.material_id}.json", "wb") as f:
-                        f.write(s.encode('utf-8'))
-            else:
-                # export only failed
-                if status == 3:
-                    detail_img.save(f'materials/fail_{self.material_id}.png')
-                    item_img.save(f'materials/item_fail_{self.material_id}.png')
-                    s = json.dumps(detected_info, ensure_ascii=False)
-                    with open(f"materials/fail_{self.material_id}.json", "wb") as f:
-                        f.write(s.encode('utf-8'))
+                    # export only failed
+                    if status == 3:
+                        detail_img.save(f'materials/fail_{self.material_id}.png')
+                        item_img.save(f'materials/item_fail_{self.material_id}.png')
+                        s = json.dumps(detected_info, ensure_ascii=False)
+                        with open(f"materials/fail_{self.material_id}.json", "wb") as f:
+                            f.write(s.encode('utf-8'))
+            except Exception as e:
+                self.logger.exception(e)
 
         def material_callback(detail_img, item_img, debug_info=None):
             detectedInfo = self.model_m.detect_info(detail_img, item_img)
@@ -800,6 +802,10 @@ class Worker(QObject):
                 self.log(f"  - Failed: {self.failed_material}")
 
         def scan_materials(target):
+            self.log('Aligning...')
+            materialScanner.alignFirstRow()
+            self.log('Completed, starting now')
+            time.sleep(0.5)
             self.log(f"Scanning [{target}]")
             try:
                 reason = materialScanner.scanMaterials(material_callback,
@@ -821,17 +827,22 @@ class Worker(QObject):
             materialScanner.clickMaterialButton()
             scan_materials("Materials")
 
-        if self.saved_material != 0:
-            if info['ExtraSettings']['ExportAllFormats']:
-                # export all formats
-                list(map(lambda exp, name: exp(name), exporter, export_name))
-            else:
-                self.log(f"Exported: {export_name[info['exporter']]}")
-                exporter[info['exporter']](export_name[info['exporter']])
+        try:
+            if self.saved_material != 0:
+                if info['ExtraSettings']['ExportAllFormats']:
+                    # export all formats
+                    list(map(lambda exp, name: exp(name), exporter, export_name))
+                else:
+                    self.log(f"Exported: {export_name[info['exporter']]}")
+                    exporter[info['exporter']](export_name[info['exporter']])
+        except Exception as e:
+            self.logger.exception(e)
+            self.error(repr(e))
+            self.log('Error occurred during export.')
         self.log(f"Scanned: {self.material_id}")
         self.log(f"  - Saved: {self.saved_material}")
         self.log(f"  - Failed: {self.failed_material}")
-        self.log('The failed result will be stored in the folder [material].')
+        self.log('The failed result will be stored in the folder [materials].')
 
         del materialsDB
         self.endScan.emit(export_name[info['exporter']])
@@ -839,6 +850,7 @@ class Worker(QObject):
 
     @pyqtSlot(dict)
     def scanArts(self, info: dict):
+        utils.ensure_standard_streams()
         self.working.emit()
         if not self.isWindowCaptured:
             self.error('The window is not captured, please recapture the window.')
@@ -979,24 +991,27 @@ class Worker(QObject):
             saveImg(detected_info, art_img, status)
 
         def saveImg(detected_info, art_img, status):
-            if self.detectSettings['ExtraSettings']['ExportAllImages']:
-                if status == 3:
-                    art_img.save(f'artifacts/fail_{self.art_id}.png')
-                    s = json.dumps(detected_info, ensure_ascii=False)
-                    with open(f"artifacts/fail_{self.art_id}.json", "wb") as f:
-                        f.write(s.encode('utf-8'))
+            try:
+                if self.detectSettings['ExtraSettings']['ExportAllImages']:
+                    if status == 3:
+                        art_img.save(f'artifacts/fail_{self.art_id}.png')
+                        s = json.dumps(detected_info, ensure_ascii=False)
+                        with open(f"artifacts/fail_{self.art_id}.json", "wb") as f:
+                            f.write(s.encode('utf-8'))
+                    else:
+                        art_img.save(f'artifacts/{self.art_id}.png')
+                        s = json.dumps(detected_info, ensure_ascii=False)
+                        with open(f"artifacts/{self.art_id}.json", "wb") as f:
+                            f.write(s.encode('utf-8'))
                 else:
-                    art_img.save(f'artifacts/{self.art_id}.png')
-                    s = json.dumps(detected_info, ensure_ascii=False)
-                    with open(f"artifacts/{self.art_id}.json", "wb") as f:
-                        f.write(s.encode('utf-8'))
-            else:
-                # export only failed
-                if status == 3:
-                    art_img.save(f'artifacts/fail_{self.art_id}.png')
-                    s = json.dumps(detected_info, ensure_ascii=False)
-                    with open(f"artifacts/fail_{self.art_id}.json", "wb") as f:
-                        f.write(s.encode('utf-8'))
+                    # export only failed
+                    if status == 3:
+                        art_img.save(f'artifacts/fail_{self.art_id}.png')
+                        s = json.dumps(detected_info, ensure_ascii=False)
+                        with open(f"artifacts/fail_{self.art_id}.json", "wb") as f:
+                            f.write(s.encode('utf-8'))
+            except Exception as e:
+                self.logger.exception(e)
 
         def artscannerCallback(art_img, debug_info=None):
             detectedInfo = self.model.detect_info(art_img)

@@ -67,7 +67,7 @@ class OCR:
         x = np.concatenate([
             self.preprocess(info[key]).T[None, :, :, None]
             for key in keys], axis=0)
-        y = self.model.predict(x)
+        y = self.model.predict(x, verbose=0)
         y = self.decode(y)
         astral_mark = self.detect_astral_mark(art_img)
         return {**{key: v for key, v in zip(keys, y)},
@@ -117,7 +117,7 @@ class OCR:
     def detect_star(self, art_img):
         star = art_img.crop([i * self.scale_ratio for i in Config_EN.star_coords])
         cropped_star = self.crop(self.normalize(self.to_gray(star), auto_inverse=False))
-        coef = cropped_star.shape[1] / cropped_star.shape[0]
+        coef = cropped_star.shape[1] / max(1, cropped_star.shape[0])
         coef = coef / 1.30882352 + 0.21568627
         return round(coef)
 
@@ -135,7 +135,9 @@ class OCR:
 
     def normalize(self, img, auto_inverse=True):
         img -= img.min()
-        img /= img.max()
+        denom = img.max()
+        if denom > 0:
+            img /= denom
         if auto_inverse and img[-1, -1] > 0.5:
             img = 1 - img
         return img
@@ -167,10 +169,12 @@ class OCR:
 
     def zoom(self, img):
         height_ = 60
+        h0 = max(1, img.shape[0])
+        w_out = max(1, int(img.shape[1] * height_ / h0))
         return (
                 np.array(
                     Image.fromarray(np.uint8(img * 255)).resize(
-                        (int(img.shape[1] * height_ / img.shape[0]), height_),
+                        (w_out, height_),
                         Image.BILINEAR, )
                 ) / 255)
 
@@ -187,10 +191,12 @@ class OCR:
 
     def resize_to_height(self, img):
         height = self.height
+        h0 = max(1, img.shape[0])
+        w_out = max(1, int(img.shape[1] * height / h0))
         return (
                 np.array(
                     Image.fromarray(np.uint8(img * 255)).resize(
-                        (int(img.shape[1] * height / img.shape[0]), height),
+                        (w_out, height),
                         Image.BILINEAR,
                     )
                 )
