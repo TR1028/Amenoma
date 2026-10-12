@@ -54,18 +54,26 @@ def test_material_name_auto_correct_billet_variants():
     assert utils.material_name_auto_correct("北陆单手剑原坯") == "北陆单手剑原胚"
     assert utils.material_name_auto_correct("央陆单手剑原坯") == "央陆单手剑原胚"
     assert utils.material_name_auto_correct("垠土单手剑原坯") == "垠土单手剑原胚"
+    assert utils.material_name_auto_correct("异的剑柄") == "裂断的剑柄"
+    assert utils.material_name_auto_correct("万石") == "万相石"
+    assert utils.material_name_auto_correct("燃铃木") == "悬铃木"
 
 
 def test_material_database_export_good_json(tmp_path):
     db = material_saver.MaterialDatabase()
     try:
         assert db.add({"name": "北陆单手剑原胚", "amount": 1}, None, None)
+        assert db.add({"name": "今昔剧画之恶尉", "amount": 15}, None, None)
         assert db.add({"name": "未知测试材料名称", "amount": 3}, None, None)
         out = tmp_path / "materials.GOOD.json"
         db.exportGOODJSON(str(out))
         data = json.loads(out.read_text(encoding="utf-8"))
         assert data["materials"]["NorthlanderSwordBillet"] == 1
+        assert data["materials"]["MaskOfTheWickedLieutenant"] == 15
         assert "未知测试材料名称" not in data["materials"]
+        assert data["背包素材"]["北陆单手剑原胚"] == 1
+        assert data["背包素材"]["今昔剧画之恶尉"] == 15
+        assert data["背包素材"]["今昔剧画的恶尉"] == 15
     finally:
         del db
 

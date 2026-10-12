@@ -94,9 +94,9 @@ def crop_amount(item_img, scale_ratio=1.0):
                 x0 = max(0, int(round(10 * scale_ratio)))
                 x1 = min(w, int(round(150 * scale_ratio)))
                 crop_arr = rgb[c_top:c_bot, x0:x1]
-                # If the beige strip was clipped at the bottom edge of item_img and digit ink touches
+                # If the crop was clipped at the bottom edge of item_img and digit ink touches
                 # the bottom row, extend the last row slightly so vertical stems (e.g. '4') stay intact.
-                if y_bot >= h - 1 and (y_bot - y_top + 1) < int(round(34 * scale_ratio)):
+                if c_bot >= h and (c_bot - c_top) < int(round(25 * scale_ratio)):
                     g_last = crop_arr[-1, :, :3].astype(np.float32) @ [0.299, 0.587, 0.114]
                     if float(g_last.min()) < 150.0:
                         pad_n = max(1, int(round(2 * scale_ratio)))
@@ -128,10 +128,19 @@ class OCR:
     def detect_info(self, detail_img, item_img):
         info = self.extract_art_info(detail_img, item_img)
         keys = sorted(info.keys())
-        x = np.concatenate([
-            self.preprocess(info[key]).T[None, :, :, None]
-            for key in keys], axis=0)
-        raw_pred = self.model.predict(x, verbose=0)
+        preprocessed = [self.preprocess(info[key]) for key in keys]
+        x = np.concatenate([p.T[None, :, :, None] for p in preprocessed], axis=0)
+        raw_pred = np.array(self.model.predict(x, verbose=0), copy=True)
+        # Mask CTC timesteps that fall strictly inside the right-hand zero-padded region so narrow
+        # strings like '11' do not emit a trailing echo '1' in the black padding.
+        blank_idx = self.charset.blank_index
+        for i, p in enumerate(preprocessed):
+            nz = np.flatnonzero(p.max(axis=0) > 0)
+            nz_w = int(nz[-1]) + 1 if len(nz) else 1
+            max_t = max(1, (nz_w + 3) // 4)
+            if max_t < raw_pred.shape[1]:
+                raw_pred[i, max_t:, :] = 0.0
+                raw_pred[i, max_t:, blank_idx] = 1.0
         y = self.decode(raw_pred)
         res = {key: v for key, v in zip(keys, y)}
         if 'amount' in res and (not res['amount'] or not res['amount'].isdigit()):

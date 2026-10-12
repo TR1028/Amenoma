@@ -299,17 +299,33 @@ def equipped_auto_correct_EN(name: str) -> str:
     return corr_name
 
 
+_MATERIAL_NAME_ALIASES = {
+    "异的剑柄": "裂断的剑柄",
+    "万石": "万相石",
+    "燃铃木": "悬铃木",
+}
+
+
 def material_name_auto_correct(name: str) -> str:
     corr_name = ""
     dis = 10000000
+    best_key = (10000000, 0, 10000000)
     norm_name = name.replace("原坯", "原胚")
     if norm_name in MaterialInfo.MaterialsNameCHS:
         return norm_name
+    if norm_name in _MATERIAL_NAME_ALIASES:
+        corr_name = _MATERIAL_NAME_ALIASES[norm_name]
+        dis = Levenshtein.distance(norm_name, corr_name)
+        logger.info(f"Corrected material name from [{name}] to [{corr_name}] with distance {dis}")
+        return corr_name
     for item in MaterialInfo.MaterialsNameCHS:
         ndis = Levenshtein.distance(norm_name, item)
-        if ndis < dis:
+        shared = sum(1 for c in norm_name if c in item)
+        cand_key = (ndis, -shared, abs(len(norm_name) - len(item)))
+        if cand_key < best_key:
             corr_name = item
             dis = ndis
+            best_key = cand_key
     if dis == 0:
         pass
     elif dis <= (len(norm_name) // 3):

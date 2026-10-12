@@ -49,10 +49,17 @@ class OCR:
     def detect_info(self, detail_img, item_img):
         info = self.extract_art_info(detail_img, item_img)
         keys = sorted(info.keys())
-        x = np.concatenate([
-            self.preprocess(info[key]).T[None, :, :, None]
-            for key in keys], axis=0)
-        raw_pred = self.model.predict(x, verbose=0)
+        preprocessed = [self.preprocess(info[key]) for key in keys]
+        x = np.concatenate([p.T[None, :, :, None] for p in preprocessed], axis=0)
+        raw_pred = np.array(self.model.predict(x, verbose=0), copy=True)
+        blank_idx = self.charset.blank_index
+        for i, p in enumerate(preprocessed):
+            nz = np.flatnonzero(p.max(axis=0) > 0)
+            nz_w = int(nz[-1]) + 1 if len(nz) else 1
+            max_t = max(1, (nz_w + 3) // 4)
+            if max_t < raw_pred.shape[1]:
+                raw_pred[i, max_t:, :] = 0.0
+                raw_pred[i, max_t:, blank_idx] = 1.0
         y = self.decode(raw_pred)
         res = {key: v for key, v in zip(keys, y)}
         if 'amount' in res and (not res['amount'] or not res['amount'].isdigit()):
