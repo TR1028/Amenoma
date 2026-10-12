@@ -43,6 +43,9 @@ LABEL_COLOR = (233, 229, 220)
 LABEL_TOLERANCE = 5
 # on the last page the list stops scrolling between two rows: rows sit this much higher
 MATERIAL_LASTROW_OFFSET = 125.5
+# an empty slot (blurred scene) has no grey-level step above this in its lower part; real cards
+# measured >= ~90 (digits / border), empty slots <= ~4
+EMPTY_SLOT_MAX_STEP = 25.0
 
 # 5.2+: filter bar above the artifact grid (+48.5 px @1600x900)
 ARTIFACT_GRID_OFFSET_Y = 77.6
@@ -240,7 +243,12 @@ def find_card_label_strip(item_img, scale_ratio=1.0):
 
 
 def is_empty_material_slot(item_img, scale_ratio=1.0):
-    """Return True when item_img is an empty inventory slot (blurred background, no card strip)."""
+    """Return True when item_img is an empty inventory slot (blurred background, no card strip).
+
+    A card always has its beige label strip and sharp glyph / border edges in the lower part
+    (max neighbour step >= ~90 grey levels on real cards); an empty slot only shows the blurred
+    scene behind the inventory, which is either bright or completely featureless.
+    """
     if find_card_label_strip(item_img, scale_ratio) is not None:
         return False
     arr = np.asarray(item_img)
@@ -251,7 +259,13 @@ def is_empty_material_slot(item_img, scale_ratio=1.0):
     h = arr.shape[0]
     y_start = max(0, min(h - 1, int(round(130 * scale_ratio))))
     bottom_gray = arr[y_start:, :, :3].astype(np.float32) @ [0.299, 0.587, 0.114]
-    return float(bottom_gray.min()) > 160.0
+    if float(bottom_gray.min()) > 160.0:
+        return True
+    if bottom_gray.shape[0] < 2 or bottom_gray.shape[1] < 2:
+        return False
+    max_step = max(float(np.abs(np.diff(bottom_gray, axis=1)).max()),
+                   float(np.abs(np.diff(bottom_gray, axis=0)).max()))
+    return max_step < EMPTY_SLOT_MAX_STEP
 
 
 def detect_row_offset(grid, column, y0, keypoint_is_label=None, tol=LABEL_TOLERANCE):

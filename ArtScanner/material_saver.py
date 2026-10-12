@@ -5,6 +5,7 @@ import persistent
 import transaction
 
 import MaterialInfo
+import biliwiki_export
 import utils
 
 
@@ -47,31 +48,24 @@ class MaterialDatabase:
             return False
 
     def exportGOODJSON(self, path):
-        biliwiki_bag = {"摩拉": 0, "今昔剧画的恶尉": 0, "今昔剧画的虎啮": 0}
-        for chs_name in MaterialInfo.MaterialsNameCHS:
-            biliwiki_bag[chs_name] = 0
-        biliwiki_aliases = {
-            "今昔剧画之恶尉": "今昔剧画的恶尉",
-            "今昔剧画之虎啮": "今昔剧画的虎啮",
-        }
         result = {
             "format": "GOOD",
             "version": 0xef,
             "source": "Amenoma",
             "materials": {},
-            "背包素材": biliwiki_bag,
         }
+        amounts = {}
         for index in range(int(self.root['size'])):
             material = self.root[str(index)]
             key = MaterialInfo.MaterialsNameCHS.get(material.name)
             if key is not None:
                 result['materials'][key] = material.amount
-                result['背包素材'][material.name] = material.amount
-                alias = biliwiki_aliases.get(material.name)
-                if alias is not None:
-                    result['背包素材'][alias] = material.amount
+                amounts[material.name] = material.amount
             else:
                 utils.logger.warning(f"[MaterialDB] Unknown material name when exporting: {material.name}")
+        # Not part of GOOD (ignored by GOOD importers): the BiliWiki 消耗计算器 reads it through
+        # 设置 -> 「导入计算器数据」, see biliwiki_export.
+        result['背包素材'] = biliwiki_export.build_bag(amounts)
         with open(path, "wb") as f:
             s = json.dumps(result, ensure_ascii=False)
             f.write(s.encode('utf-8'))

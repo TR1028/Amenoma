@@ -64,19 +64,9 @@ def find_beige_strip(item_img, scale_ratio=1.0):
 
 
 def is_empty_material_slot(item_img, scale_ratio=1.0):
-    """Return True when item_img is an empty inventory slot (blurred background, no card strip)."""
-    if find_beige_strip(item_img, scale_ratio) is not None:
-        return False
-    arr = np.asarray(item_img)
-    if arr.ndim < 3 or arr.shape[2] < 3:
-        return False
-    # Ignore synthetic uniform test images
-    if float(arr.max()) - float(arr.min()) <= 1.0:
-        return False
-    h = arr.shape[0]
-    y_start = max(0, min(h - 1, int(round(130 * scale_ratio))))
-    bottom_gray = arr[y_start:, :, :3].astype(np.float32) @ [0.299, 0.587, 0.114]
-    return float(bottom_gray.min()) > 160.0
+    """Return True when item_img is an empty inventory slot, see layout.is_empty_material_slot."""
+    import layout
+    return layout.is_empty_material_slot(item_img, scale_ratio)
 
 
 def crop_amount(item_img, scale_ratio=1.0):
@@ -107,6 +97,35 @@ def crop_amount(item_img, scale_ratio=1.0):
     return item_img.crop([i * scale_ratio for i in Config.amount_coords])
 
 
+def mask_amount_padding(pred, preprocessed, blank_index, min_keep_prob=0.9):
+    """Remove the trailing echo material_model_7.1.0 sometimes adds to amounts ('11' -> '111').
+
+    The model emits the k-th digit around CTC timestep 2k, which on real amounts was always before
+    ceil(ink_width / 4) (ink_width = inked columns of the 16 px high model input).  The echo is a
+    low-confidence repeat of the last digit at/after that point (p 0.58-0.72, real digits >= 0.86).
+    Late emissions are blanked only when they are also unsure, so a real last digit that lands
+    late is kept.
+
+    Must NOT be applied to the name row: the BiLSTM emits (CJK) name characters far right of the
+    ink, blanking there drops the last characters of the name.
+
+    :param pred: (timesteps, classes) prediction of one row, modified in place
+    :param preprocessed: the (height, width) model input of that row
+    """
+    preprocessed = np.asarray(preprocessed)
+    timesteps = pred.shape[0]
+    if timesteps < 1 or preprocessed.ndim != 2:
+        return pred
+    cols = np.flatnonzero(preprocessed.max(axis=0) > 0)
+    ink_w = int(cols[-1]) + 1 if len(cols) else 1
+    for t in range(max(1, (ink_w + 3) // 4), timesteps):
+        c = int(np.argmax(pred[t]))
+        if c != blank_index and float(pred[t, c]) < min_keep_prob:
+            pred[t, :] = 0.0
+            pred[t, blank_index] = 1.0
+    return pred
+
+
 class OCR:
     def __init__(self, model, scale_ratio=1):
         self.scale_ratio = scale_ratio
@@ -131,16 +150,9 @@ class OCR:
         preprocessed = [self.preprocess(info[key]) for key in keys]
         x = np.concatenate([p.T[None, :, :, None] for p in preprocessed], axis=0)
         raw_pred = np.array(self.model.predict(x, verbose=0), copy=True)
-        # Mask CTC timesteps that fall strictly inside the right-hand zero-padded region so narrow
-        # strings like '11' do not emit a trailing echo '1' in the black padding.
-        blank_idx = self.charset.blank_index
-        for i, p in enumerate(preprocessed):
-            nz = np.flatnonzero(p.max(axis=0) > 0)
-            nz_w = int(nz[-1]) + 1 if len(nz) else 1
-            max_t = max(1, (nz_w + 3) // 4)
-            if max_t < raw_pred.shape[1]:
-                raw_pred[i, max_t:, :] = 0.0
-                raw_pred[i, max_t:, blank_idx] = 1.0
+        if 'amount' in keys:
+            amt_idx = keys.index('amount')
+            mask_amount_padding(raw_pred[amt_idx], preprocessed[amt_idx], self.charset.blank_index)
         y = self.decode(raw_pred)
         res = {key: v for key, v in zip(keys, y)}
         if 'amount' in res and (not res['amount'] or not res['amount'].isdigit()):
