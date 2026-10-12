@@ -204,6 +204,56 @@ def find_label_runs(column, y0, tol=LABEL_TOLERANCE, min_len=3):
     return runs
 
 
+def find_card_label_strip(item_img, scale_ratio=1.0):
+    """Locate the (y_top, y_bot) rows of the beige label strip inside a single card image."""
+    arr = np.asarray(item_img)
+    if arr.ndim < 3 or arr.shape[2] < 3:
+        return None
+    rgb = arr[..., :3].astype(np.int32)
+    h, w, _ = rgb.shape
+    y_start = max(0, min(h - 1, int(round(130 * scale_ratio))))
+    x0 = max(0, min(w - 1, int(round(6 * scale_ratio))))
+    x1 = max(x0 + 1, min(w, int(round(18 * scale_ratio))))
+    strip = rgb[y_start:, x0:x1, :]
+    is_beige = (
+        (np.abs(strip[:, :, 0] - LABEL_COLOR[0]) <= 12) &
+        (np.abs(strip[:, :, 1] - LABEL_COLOR[1]) <= 12) &
+        (np.abs(strip[:, :, 2] - LABEL_COLOR[2]) <= 12)
+    ).any(axis=1)
+    best_start, best_end = None, None
+    cur_start = None
+    for i, val in enumerate(is_beige):
+        if val and cur_start is None:
+            cur_start = i
+        elif not val and cur_start is not None:
+            if best_start is None or (i - cur_start) >= (best_end - best_start + 1):
+                best_start, best_end = cur_start, i - 1
+            cur_start = None
+    if cur_start is not None:
+        i = len(is_beige)
+        if best_start is None or (i - cur_start) >= (best_end - best_start + 1):
+            best_start, best_end = cur_start, i - 1
+    min_run = max(5, int(round(15 * scale_ratio)))
+    if best_start is not None and (best_end - best_start + 1) >= min_run:
+        return y_start + best_start, y_start + best_end
+    return None
+
+
+def is_empty_material_slot(item_img, scale_ratio=1.0):
+    """Return True when item_img is an empty inventory slot (blurred background, no card strip)."""
+    if find_card_label_strip(item_img, scale_ratio) is not None:
+        return False
+    arr = np.asarray(item_img)
+    if arr.ndim < 3 or arr.shape[2] < 3:
+        return False
+    if float(arr.max()) - float(arr.min()) <= 1.0:
+        return False
+    h = arr.shape[0]
+    y_start = max(0, min(h - 1, int(round(130 * scale_ratio))))
+    bottom_gray = arr[y_start:, :, :3].astype(np.float32) @ [0.299, 0.587, 0.114]
+    return float(bottom_gray.min()) > 160.0
+
+
 def detect_row_offset(grid, column, y0, keypoint_is_label=None, tol=LABEL_TOLERANCE):
     """Measure how far the grid is scrolled away from the row aligned layout.
 

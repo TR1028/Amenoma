@@ -18,6 +18,9 @@ get_logger().setLevel(logging.ERROR)
 #     def __init__(self, model_path='mn_model.h5', scale_ratio=1):
 #         pass
 
+from ocr_m import find_beige_strip, is_empty_material_slot, crop_amount
+
+
 class Config:
     name_coords = [33, 8, 619, 69]
     type_coords = [32, 89, 350, 134]
@@ -45,17 +48,34 @@ class OCR:
 
     def detect_info(self, detail_img, item_img):
         info = self.extract_art_info(detail_img, item_img)
+        keys = sorted(info.keys())
         x = np.concatenate([
             self.preprocess(info[key]).T[None, :, :, None]
-            for key in sorted(info.keys())], axis=0)
-        y = self.model.predict(x, verbose=0)
-        y = self.decode(y)
-        return {**{key: v for key, v in zip(sorted(info.keys()), y)},
-                **{'star': self.detect_star(detail_img)}}
+            for key in keys], axis=0)
+        raw_pred = self.model.predict(x, verbose=0)
+        y = self.decode(raw_pred)
+        res = {key: v for key, v in zip(keys, y)}
+        if 'amount' in res and (not res['amount'] or not res['amount'].isdigit()):
+            amt_idx = keys.index('amount')
+            digit_decoded = self.decode_digits(raw_pred[amt_idx:amt_idx + 1])
+            if digit_decoded and digit_decoded[0]:
+                res['amount'] = digit_decoded[0]
+        res['star'] = self.detect_star(detail_img)
+        return res
+
+    def decode_digits(self, pred):
+        pred = np.asarray(pred)
+        allowed = [i + 1 for i, c in enumerate(self.characters) if c in "0123456789"]
+        if not allowed:
+            return self.decode(pred)
+        allowed.append(self.charset.blank_index)
+        mask = np.zeros(pred.shape[-1], dtype=pred.dtype)
+        mask[allowed] = 1
+        return self.charset.greedy_decode(pred * mask)
 
     def extract_art_info(self, material_img, item_img):
         name = material_img.crop([i * self.scale_ratio for i in Config.name_coords])
-        amount = item_img.crop([i * self.scale_ratio for i in Config.amount_coords])
+        amount = crop_amount(item_img, self.scale_ratio)
         return {key: value for key, value in locals().items() if key not in ['material_img', 'item_img', 'self']}
 
     def detect_star(self, material_img):

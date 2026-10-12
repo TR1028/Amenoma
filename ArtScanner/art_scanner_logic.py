@@ -236,6 +236,8 @@ class ArtScannerLogic:
         :return: (rows to scan, offset_y for scanRows, info dict for logging)
         """
         first_new = self.grid.rows - rows_scrolled
+        if getattr(self.game_info, "hwnd", 0):
+            time.sleep(0.3)
         detected = self.locateRows()
         if detected is not None:
             offset_y, visible = detected

@@ -87,6 +87,8 @@ class MaterialScannerLogic:
                         self.scanner.game_info.art_info_top + self.scanner.game_info.art_info_height))
                     item_coord = getMaterialItemCoord(self.scanner.game_info, art_row, art_col, offset_y=offset_y)
                     item_img = captureWindow(self.scanner.game_info.hwnd, item_coord)
+                    if layout.is_empty_material_slot(item_img, self.scanner.grid.scale_ratio):
+                        return False
 
                     if debug_material_crop:
                         debug_info = {
@@ -137,13 +139,14 @@ class MaterialScannerLogic:
         self.page = 0
         self.scanner.page = 0
         self.scanner.last_page_info = None
+        page_offset_y = 0
 
         while True:
             if self.scanner.stopped:
                 return "stopped"
             if on_page is not None:
-                on_page(self.page, list(range(rows)), 0, None)
-            if not self.scanRows(range(rows), callback, offset_y=0, debug=debug):
+                on_page(self.page, list(range(rows)), page_offset_y, None)
+            if not self.scanRows(range(rows), callback, offset_y=page_offset_y, debug=debug):
                 return "stopped" if self.scanner.stopped else "no_item"
 
             scrolled = self.scrollToRow(rows, max_scrolls=20, extra_scroll=int(rows > 5), interval=interval)
@@ -151,6 +154,13 @@ class MaterialScannerLogic:
             self.scanner.page += 1
 
             if scrolled >= rows:
+                page_offset_y = 0
+                try:
+                    detected = self.scanner.locateRows()
+                    if detected is not None and abs(detected[0]) <= 25 * self.scanner.grid.scale_ratio:
+                        page_offset_y = detected[0]
+                except Exception:
+                    page_offset_y = 0
                 continue
 
             last_rows, offset_y, info = self.scanner.lastPageRows(scrolled)

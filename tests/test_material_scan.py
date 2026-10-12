@@ -88,3 +88,44 @@ def test_ocr_m_with_null_streams_and_thin_crops(monkeypatch):
 
     res = model.detect_info(detail, item)
     assert "name" in res and "amount" in res and "star" in res
+
+
+def test_adaptive_material_amount_crop_and_empty_slot_detection():
+    import layout
+
+    # 1. Empty slot (blurred warm background, no beige strip and no dark digit ink)
+    empty = np.full((203, 164, 3), (225, 205, 195), dtype=np.uint8)
+    empty[:50, :, :] = (235, 215, 205)
+    empty_img = Image.fromarray(empty)
+    assert layout.find_card_label_strip(empty_img, 1.0) is None
+    assert layout.is_empty_material_slot(empty_img, 1.0) is True
+
+    # 2. Shifted-up card: beige strip at y=154..190, white border at 191..194, dark gap at 195..202
+    card = np.full((203, 164, 3), (105, 95, 153), dtype=np.uint8)
+    card[154:191, :, :] = (233, 229, 220)
+    card[191:195, :, :] = (255, 255, 255)
+    card[195:203, :, :] = (80, 70, 80)
+    # Digit at y=163..183 (would be half cut off by legacy y=175..203 crop)
+    card[163:184, 76:88, :] = (73, 83, 102)
+    card_img = Image.fromarray(card)
+
+    assert layout.is_empty_material_slot(card_img, 1.0) is False
+    assert layout.find_card_label_strip(card_img, 1.0) == (154, 190)
+
+    ocr_m = pytest.importorskip("ocr_m")
+    cropped = np.asarray(ocr_m.crop_amount(card_img, 1.0))
+    # Bottom-right corner of cropped amount must be beige (not the dark gap at y>=195)
+    assert tuple(cropped[-1, -1, :3]) == (233, 229, 220)
+    # Full digit height (21 rows) must be inside the crop
+    digit_rows = np.flatnonzero((cropped[:, :, 0] < 100).any(axis=1))
+    assert len(digit_rows) == 21
+
+    # 3. Bottom-clipped card: beige strip at y=176..202 with digit ink touching y=202
+    clipped = np.full((203, 164, 3), (96, 110, 148), dtype=np.uint8)
+    clipped[176:203, :, :] = (233, 229, 220)
+    clipped[185:203, 78:86, :] = (73, 83, 102)
+    clipped_img = Image.fromarray(clipped)
+    cropped_clipped = np.asarray(ocr_m.crop_amount(clipped_img, 1.0))
+    # Height is extended by 2 rows (from 203 - 182 = 21 to 23) to restore clipped stem
+    assert cropped_clipped.shape[0] == 23
+

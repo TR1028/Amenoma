@@ -25,6 +25,88 @@ class Config:
     amount_coords = [10, 175, 150, 203]
 
 
+def find_beige_strip(item_img, scale_ratio=1.0):
+    """Locate the (y_top, y_bot) rows of the beige label strip in a material card image.
+
+    Returns (y_top, y_bot) inclusive in item_img pixel coordinates, or None if not found.
+    """
+    arr = np.asarray(item_img)
+    if arr.ndim < 3 or arr.shape[2] < 3:
+        return None
+    arr = arr[..., :3].astype(np.int32)
+    h, w, _ = arr.shape
+    y_start = max(0, min(h - 1, int(round(130 * scale_ratio))))
+    x0 = max(0, min(w - 1, int(round(6 * scale_ratio))))
+    x1 = max(x0 + 1, min(w, int(round(18 * scale_ratio))))
+    strip = arr[y_start:, x0:x1, :]
+    is_beige = (
+        (np.abs(strip[:, :, 0] - 233) <= 12) &
+        (np.abs(strip[:, :, 1] - 229) <= 12) &
+        (np.abs(strip[:, :, 2] - 220) <= 12)
+    ).any(axis=1)
+    best_start, best_end = None, None
+    cur_start = None
+    for i, val in enumerate(is_beige):
+        if val and cur_start is None:
+            cur_start = i
+        elif not val and cur_start is not None:
+            if best_start is None or (i - cur_start) >= (best_end - best_start + 1):
+                best_start, best_end = cur_start, i - 1
+            cur_start = None
+    if cur_start is not None:
+        i = len(is_beige)
+        if best_start is None or (i - cur_start) >= (best_end - best_start + 1):
+            best_start, best_end = cur_start, i - 1
+    min_run = max(5, int(round(15 * scale_ratio)))
+    if best_start is not None and (best_end - best_start + 1) >= min_run:
+        return y_start + best_start, y_start + best_end
+    return None
+
+
+def is_empty_material_slot(item_img, scale_ratio=1.0):
+    """Return True when item_img is an empty inventory slot (blurred background, no card strip)."""
+    if find_beige_strip(item_img, scale_ratio) is not None:
+        return False
+    arr = np.asarray(item_img)
+    if arr.ndim < 3 or arr.shape[2] < 3:
+        return False
+    # Ignore synthetic uniform test images
+    if float(arr.max()) - float(arr.min()) <= 1.0:
+        return False
+    h = arr.shape[0]
+    y_start = max(0, min(h - 1, int(round(130 * scale_ratio))))
+    bottom_gray = arr[y_start:, :, :3].astype(np.float32) @ [0.299, 0.587, 0.114]
+    return float(bottom_gray.min()) > 160.0
+
+
+def crop_amount(item_img, scale_ratio=1.0):
+    """Crop the material count region dynamically from the card's beige label strip."""
+    arr = np.asarray(item_img)
+    if arr.ndim >= 3 and arr.shape[2] >= 3:
+        rgb = arr[..., :3]
+        h, w, _ = rgb.shape
+        bounds = find_beige_strip(item_img, scale_ratio)
+        if bounds is not None:
+            y_top, y_bot = bounds
+            c_top = min(h - 1, y_top + int(round(6 * scale_ratio)))
+            c_bot = min(h, y_bot + 1, y_top + int(round(32 * scale_ratio)))
+            if c_bot - c_top >= max(4, int(round(12 * scale_ratio))):
+                x0 = max(0, int(round(10 * scale_ratio)))
+                x1 = min(w, int(round(150 * scale_ratio)))
+                crop_arr = rgb[c_top:c_bot, x0:x1]
+                # If the beige strip was clipped at the bottom edge of item_img and digit ink touches
+                # the bottom row, extend the last row slightly so vertical stems (e.g. '4') stay intact.
+                if y_bot >= h - 1 and (y_bot - y_top + 1) < int(round(34 * scale_ratio)):
+                    g_last = crop_arr[-1, :, :3].astype(np.float32) @ [0.299, 0.587, 0.114]
+                    if float(g_last.min()) < 150.0:
+                        pad_n = max(1, int(round(2 * scale_ratio)))
+                        crop_arr = np.concatenate(
+                            [crop_arr, np.repeat(crop_arr[-1:, :, :], pad_n, axis=0)], axis=0
+                        )
+                return Image.fromarray(crop_arr)
+    return item_img.crop([i * scale_ratio for i in Config.amount_coords])
+
+
 class OCR:
     def __init__(self, model, scale_ratio=1):
         self.scale_ratio = scale_ratio
@@ -45,17 +127,34 @@ class OCR:
 
     def detect_info(self, detail_img, item_img):
         info = self.extract_art_info(detail_img, item_img)
+        keys = sorted(info.keys())
         x = np.concatenate([
             self.preprocess(info[key]).T[None, :, :, None]
-            for key in sorted(info.keys())], axis=0)
-        y = self.model.predict(x, verbose=0)
-        y = self.decode(y)
-        return {**{key: v for key, v in zip(sorted(info.keys()), y)},
-                **{'star': self.detect_star(detail_img)}}
+            for key in keys], axis=0)
+        raw_pred = self.model.predict(x, verbose=0)
+        y = self.decode(raw_pred)
+        res = {key: v for key, v in zip(keys, y)}
+        if 'amount' in res and (not res['amount'] or not res['amount'].isdigit()):
+            amt_idx = keys.index('amount')
+            digit_decoded = self.decode_digits(raw_pred[amt_idx:amt_idx + 1])
+            if digit_decoded and digit_decoded[0]:
+                res['amount'] = digit_decoded[0]
+        res['star'] = self.detect_star(detail_img)
+        return res
+
+    def decode_digits(self, pred):
+        pred = np.asarray(pred)
+        allowed = [i + 1 for i, c in enumerate(self.characters) if c in "0123456789"]
+        if not allowed:
+            return self.decode(pred)
+        allowed.append(self.charset.blank_index)
+        mask = np.zeros(pred.shape[-1], dtype=pred.dtype)
+        mask[allowed] = 1
+        return self.charset.greedy_decode(pred * mask)
 
     def extract_art_info(self, material_img, item_img):
         name = material_img.crop([i * self.scale_ratio for i in Config.name_coords])
-        amount = item_img.crop([i * self.scale_ratio for i in Config.amount_coords])
+        amount = crop_amount(item_img, self.scale_ratio)
         return {key: value for key, value in locals().items() if key not in ['material_img', 'item_img', 'self']}
 
     def detect_star(self, material_img):
